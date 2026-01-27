@@ -25,8 +25,9 @@ export function KpiCard({ title, value, icon, description, trend }: KpiCardProps
           <p className="text-xs text-muted-foreground mt-1">{description}</p>
         )}
         {trend && (
-          <p className={`text-xs mt-1 ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-            {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value).toFixed(1)}%
+          <p className={`text-xs mt-1 font-medium flex items-center gap-1 ${trend.isPositive ? 'text-success' : 'text-destructive'}`}>
+            <span>{trend.isPositive ? '↑' : '↓'}</span>
+            <span>{Math.abs(trend.value).toFixed(1)}%</span>
           </p>
         )}
       </CardContent>

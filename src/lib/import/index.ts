@@ -2,19 +2,13 @@ import ExcelJS from 'exceljs';
 import { saveDataToDatabase } from './db';
 import { detectAndParse } from './parsers';
 import { Buffer } from 'node:buffer';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/supabase';
 
-/**
- * Ponto de entrada principal para o processo de importação.
- *
- * @param fileBuffer O buffer do arquivo .xlsx enviado.
- * @param userId O ID do usuário que está fazendo o upload.
- * @param storeId O ID da loja de destino.
- * @param fileName O nome original do arquivo.
- * @returns Uma promessa que resolve com o resultado do parsing ou lança um erro.
- */
 /**
  * Processa um arquivo Excel e importa os dados no banco de dados.
  * 
+ * @param supabase Cliente Supabase (deve ser passado da Route Handler)
  * @param fileBuffer Buffer do arquivo .xlsx
  * @param userId ID do usuário autenticado
  * @param storeId ID da loja (ou 'temp-store-id' para criar automaticamente)
@@ -22,6 +16,7 @@ import { Buffer } from 'node:buffer';
  * @returns Resultado da importação com estrutura padronizada
  */
 export async function processImport(
+  supabase: SupabaseClient<Database>,
   fileBuffer: Buffer, 
   userId: string, 
   storeId: string, 
@@ -54,10 +49,25 @@ export async function processImport(
       throw new Error('Não foi possível acessar a primeira planilha.');
     }
 
-    // 4. Extrai todas as linhas como arrays
+    // 4. Extrai todas as linhas como arrays (INCLUINDO o cabeçalho)
     const rows: any[][] = [];
+    
+    // Primeiro, extrai o cabeçalho (linha 1)
+    const headerRow: any[] = [];
+    const firstRow = worksheet.getRow(1);
+    firstRow.eachCell({ includeEmpty: true }, (cell) => {
+      headerRow.push(cell.value);
+    });
+    // Remove primeira coluna vazia se existir
+    if (headerRow.length > 0 && (headerRow[0] === null || headerRow[0] === undefined || headerRow[0] === '')) {
+      headerRow.shift();
+    }
+    rows.push(headerRow);
+    console.log(`[processImport] Cabeçalho extraído: ${headerRow.length} colunas`);
+    
+    // Depois, extrai as linhas de dados (a partir da linha 2)
     worksheet.eachRow((row, rowNumber) => {
-      // Pula a primeira linha (cabeçalho)
+      // Pula a primeira linha (já foi extraída acima)
       if (rowNumber === 1) return;
       
       const rowValues: any[] = [];
@@ -76,17 +86,38 @@ export async function processImport(
       }
     });
 
-    if (rows.length === 0) {
+    if (rows.length <= 1) {
       throw new Error('Nenhum dado encontrado na planilha. Verifique se há linhas de dados além do cabeçalho.');
     }
 
-    console.log(`[processImport] Processando ${rows.length} linhas de dados do arquivo ${fileName}`);
+    console.log(`[processImport] Total de linhas extraídas: ${rows.length} (1 cabeçalho + ${rows.length - 1} linhas de dados)`);
 
     // 5. Detecta e faz parse dos dados
+    console.log(`[processImport] Tentando detectar marketplace...`);
+    console.log(`[processImport] Primeiras 3 linhas para debug:`, rows.slice(0, 3));
+    
     const result = detectAndParse(rows);
 
     if (!result) {
-      throw new Error('Não foi possível identificar o marketplace da planilha. Verifique se o arquivo é de um marketplace suportado (Mercado Livre, Shopee, Shein, TikTok).');
+      // Mostra informações detalhadas para ajudar no debug
+      const headerRow = rows[0] || [];
+      const headerText = headerRow.map((h: any) => String(h || '')).join(' | ');
+      
+      console.error('[processImport] ❌ Falha na detecção do marketplace');
+      console.error('[processImport] Cabeçalho completo:', headerRow);
+      console.error('[processImport] Cabeçalho (texto):', headerText);
+      console.error('[processImport] Total de linhas:', rows.length);
+      
+      throw new Error(
+        `Não foi possível identificar o marketplace da planilha.\n\n` +
+        `Cabeçalho detectado: ${headerText.substring(0, 200)}\n\n` +
+        `Verifique se o arquivo é de um marketplace suportado:\n` +
+        `- Mercado Livre: deve ter colunas como "Nº de Venda" ou "Venda"\n` +
+        `- Shopee: deve ter colunas como "Order ID" ou "Order SN"\n` +
+        `- Shein: deve ter colunas como "Order No" ou "Order Number"\n` +
+        `- TikTok: deve ter colunas como "Order ID" ou "Order SN"\n\n` +
+        `Todos devem ter uma coluna de data (Date, Time, Data, etc.)`
+      );
     }
 
     if (!result.normalizedData || result.normalizedData.length === 0) {
@@ -97,6 +128,7 @@ export async function processImport(
 
     // 6. Salva os dados no banco de dados
     const saveResult = await saveDataToDatabase(
+      supabase,
       userId, 
       result.marketplaceName, 
       result.normalizedData, 

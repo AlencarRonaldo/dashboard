@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     // 5. Processa a importação
     console.log('[API /api/import] Iniciando processamento da importação...');
-    const result = await processImport(buffer, session.user.id, storeId, file.name);
+    const result = await processImport(supabase, buffer, session.user.id, storeId, file.name);
     console.log('[API /api/import] Processamento concluído:', result);
 
     // 6. Retorna resposta de sucesso (sempre JSON)

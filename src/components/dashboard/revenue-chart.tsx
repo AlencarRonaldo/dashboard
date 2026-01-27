@@ -33,7 +33,7 @@ export function RevenueChart({ data, period = 'day' }: RevenueChartProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
             <XAxis 
               dataKey="date" 
               tickFormatter={(value) => {
@@ -59,16 +59,18 @@ export function RevenueChart({ data, period = 'day' }: RevenueChartProps) {
             <Line 
               type="monotone" 
               dataKey="revenue" 
-              stroke="#8884d8" 
+              stroke="#3B82F6" 
               name="Faturamento"
-              strokeWidth={2}
+              strokeWidth={3}
+              dot={{ fill: "#3B82F6", r: 4 }}
             />
             <Line 
               type="monotone" 
               dataKey="profit" 
-              stroke="#82ca9d" 
+              stroke="#16A34A" 
               name="Lucro"
-              strokeWidth={2}
+              strokeWidth={3}
+              dot={{ fill: "#16A34A", r: 4 }}
             />
           </LineChart>
         </ResponsiveContainer>

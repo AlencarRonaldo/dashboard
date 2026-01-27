@@ -28,13 +28,46 @@ class TikTokParser implements MarketplaceParser {
   }
 
   private isTikTokSheet(headerRow: string[]): boolean {
-    const tiktokIndicators = ['order id', 'orderid', 'tiktok', 'tiktok shop', 'pedido', 'order sn'];
+    const tiktokIndicators = [
+      'order id', 'orderid', 'tiktok', 'tiktok shop', 'pedido', 
+      'order sn', 'order_sn', 'ordersn', 'tiktok shop'
+    ];
     const headerText = headerRow.join(' ').toLowerCase();
-    const hasIndicator = tiktokIndicators.some(indicator => headerText.includes(indicator));
-    const hasTikTokColumns = 
-      (headerRow.some(h => h.includes('order') && (h.includes('id') || h.includes('sn'))) || headerRow.some(h => h.includes('order id'))) &&
-      (headerRow.some(h => h.includes('create time') || h.includes('order time') || h.includes('date') || h.includes('data') || h.includes('time')));
-    return hasIndicator || hasTikTokColumns;
+    const hasIndicator = tiktokIndicators.some(indicator => headerText.includes(indicator.toLowerCase()));
+    
+    const hasOrderColumn = headerRow.some(h => {
+      const hLower = String(h || '').toLowerCase();
+      return (
+        (hLower.includes('order') && (hLower.includes('id') || hLower.includes('sn'))) ||
+        hLower.includes('order id') ||
+        hLower.includes('order_sn')
+      );
+    });
+    
+    const hasDateColumn = headerRow.some(h => {
+      const hLower = String(h || '').toLowerCase();
+      return (
+        hLower.includes('create time') || 
+        hLower.includes('order time') || 
+        hLower.includes('date') || 
+        hLower.includes('data') || 
+        hLower.includes('time') ||
+        hLower.includes('criação')
+      );
+    });
+    
+    const hasTikTokColumns = hasOrderColumn && hasDateColumn;
+    
+    const result = hasIndicator || hasTikTokColumns;
+    
+    if (!result) {
+      console.log('[TikTokParser] Não identificado. Verificações:');
+      console.log('  - Indicadores encontrados:', hasIndicator);
+      console.log('  - Coluna de pedido encontrada:', hasOrderColumn);
+      console.log('  - Coluna de data encontrada:', hasDateColumn);
+    }
+    
+    return result;
   }
 
   private mapColumns(headerRow: string[]): any {

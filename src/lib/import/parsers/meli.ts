@@ -31,14 +31,41 @@ class MeliParser implements MarketplaceParser {
   }
 
   private isMeliSheet(headerRow: string[]): boolean {
-    const meliIndicators = ['nº de venda', 'numero de venda', 'n° de venda', 'venda', 'mercado livre', 'meli', 'ml-', 'order id'];
+    const meliIndicators = [
+      'nº de venda', 'numero de venda', 'n° de venda', 'número de venda',
+      'venda', 'mercado livre', 'meli', 'ml-', 'order id', 'orderid',
+      'id da venda', 'id venda', 'venda id', 'pedido ml'
+    ];
     const headerText = headerRow.join(' ').toLowerCase();
-    const hasIndicator = meliIndicators.some(indicator => headerText.includes(indicator));
-    const hasMeliColumns = 
-      (headerRow.some(h => (h.includes('venda') || h.includes('pedido')) && (h.includes('nº') || h.includes('numero') || h.includes('id'))) ||
-       headerRow.some(h => h.includes('ml-'))) &&
-      (headerRow.some(h => h.includes('data') || h.includes('date')));
-    return hasIndicator || hasMeliColumns;
+    const hasIndicator = meliIndicators.some(indicator => headerText.includes(indicator.toLowerCase()));
+    
+    const hasMeliOrderColumn = headerRow.some(h => {
+      const hLower = String(h || '').toLowerCase();
+      return (
+        (hLower.includes('venda') || hLower.includes('pedido')) && 
+        (hLower.includes('nº') || hLower.includes('numero') || hLower.includes('número') || hLower.includes('id')) ||
+        hLower.includes('ml-') ||
+        (hLower.includes('order') && hLower.includes('id'))
+      );
+    });
+    
+    const hasDateColumn = headerRow.some(h => {
+      const hLower = String(h || '').toLowerCase();
+      return hLower.includes('data') || hLower.includes('date') || hLower.includes('time');
+    });
+    
+    const hasMeliColumns = hasMeliOrderColumn && hasDateColumn;
+    
+    const result = hasIndicator || hasMeliColumns;
+    
+    if (!result) {
+      console.log('[MeliParser] Não identificado. Verificações:');
+      console.log('  - Indicadores encontrados:', hasIndicator);
+      console.log('  - Coluna de venda encontrada:', hasMeliOrderColumn);
+      console.log('  - Coluna de data encontrada:', hasDateColumn);
+    }
+    
+    return result;
   }
 
   private mapColumns(headerRow: string[]): any {

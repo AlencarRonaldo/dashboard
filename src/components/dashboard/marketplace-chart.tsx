@@ -32,7 +32,7 @@ export function MarketplaceChart({ data }: MarketplaceChartProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
             <XAxis dataKey="marketplace" />
             <YAxis 
               tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
@@ -47,8 +47,8 @@ export function MarketplaceChart({ data }: MarketplaceChartProps) {
               ]}
             />
             <Legend />
-            <Bar dataKey="revenue" fill="#8884d8" name="Faturamento" />
-            <Bar dataKey="profit" fill="#82ca9d" name="Lucro" />
+            <Bar dataKey="revenue" fill="#3B82F6" name="Faturamento" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="profit" fill="#16A34A" name="Lucro" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

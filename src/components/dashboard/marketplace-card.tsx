@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface MarketplaceCardProps {
   marketplace: string;
@@ -15,6 +16,30 @@ interface MarketplaceCardProps {
   };
 }
 
+// Mapeamento de cores por marketplace
+const marketplaceColors: Record<string, { primary: string; bg: string; border: string }> = {
+  'Mercado Livre': {
+    primary: '#FFE135',
+    bg: '#FFF9E6',
+    border: '#FFE135',
+  },
+  'Shopee': {
+    primary: '#EE4D2D',
+    bg: '#FFF4F0',
+    border: '#EE4D2D',
+  },
+  'Shein': {
+    primary: '#1F2937',
+    bg: '#F3F4F6',
+    border: '#1F2937',
+  },
+  'TikTok Shop': {
+    primary: '#00F2EA',
+    bg: '#E6FFFE',
+    border: '#00F2EA',
+  },
+};
+
 export function MarketplaceCard({
   marketplace,
   revenue,
@@ -23,44 +48,51 @@ export function MarketplaceCard({
   margin,
   trend,
 }: MarketplaceCardProps) {
+  const colors = marketplaceColors[marketplace] || {
+    primary: '#6B7280',
+    bg: '#F9FAFB',
+    border: '#E5E7EB',
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{marketplace}</CardTitle>
+    <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: colors.border }}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-semibold">{marketplace}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <div className="text-2xl font-bold">{formatCurrency(revenue)}</div>
-          <p className="text-xs text-muted-foreground">Faturamento Total</p>
+          <div className="text-2xl font-bold text-foreground">{formatCurrency(revenue)}</div>
+          <p className="text-xs text-muted-foreground mt-1">Faturamento Total</p>
         </div>
         
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <div className="text-lg font-semibold">{formatCurrency(profit)}</div>
+            <div className="text-lg font-semibold text-success">{formatCurrency(profit)}</div>
             <p className="text-xs text-muted-foreground">Lucro</p>
           </div>
           <div>
-            <div className="text-lg font-semibold">{orders}</div>
+            <div className="text-lg font-semibold text-foreground">{orders}</div>
             <p className="text-xs text-muted-foreground">Pedidos</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center justify-between pt-2 border-t border-border">
           <div>
-            <div className="text-sm font-medium">{margin.toFixed(1)}%</div>
+            <div className="text-sm font-medium text-foreground">{margin.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">Margem</p>
           </div>
           {trend && (
             <div className="flex items-center gap-1">
               {trend.isPositive ? (
-                <TrendingUp className="h-4 w-4 text-green-600" />
+                <TrendingUp className="h-4 w-4 text-success" />
               ) : (
-                <TrendingDown className="h-4 w-4 text-red-600" />
+                <TrendingDown className="h-4 w-4 text-destructive" />
               )}
               <span
-                className={`text-xs font-medium ${
-                  trend.isPositive ? 'text-green-600' : 'text-red-600'
-                }`}
+                className={cn(
+                  'text-xs font-medium',
+                  trend.isPositive ? 'text-success' : 'text-destructive'
+                )}
               >
                 {trend.isPositive ? '+' : ''}
                 {trend.value.toFixed(1)}%

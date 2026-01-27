@@ -52,7 +52,7 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 p-4 bg-muted/30 rounded-lg border border-border">
           <Select
             value={filters.marketplace}
             onChange={(e) => setFilters({ ...filters, marketplace: e.target.value })}
@@ -94,18 +94,18 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
           />
         </div>
 
-        <div className="rounded-md border">
+        <div className="rounded-md border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="h-12 px-4 text-left align-middle font-medium">Data</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium">Marketplace</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium">Loja</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium">SKU</th>
-                  <th className="h-12 px-4 text-right align-middle font-medium">Faturamento</th>
-                  <th className="h-12 px-4 text-right align-middle font-medium">Lucro</th>
-                  <th className="h-12 px-4 text-right align-middle font-medium">Margem</th>
+                <tr className="border-b border-border bg-muted">
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">Data</th>
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">Marketplace</th>
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">Loja</th>
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">SKU</th>
+                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground">Faturamento</th>
+                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground">Lucro</th>
+                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground">Margem</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,15 +116,22 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => (
-                    <tr key={order.id} className="border-b transition-colors hover:bg-muted/50">
-                      <td className="p-4 align-middle">{formatDate(order.date)}</td>
-                      <td className="p-4 align-middle">{order.marketplace}</td>
-                      <td className="p-4 align-middle">{order.store}</td>
-                      <td className="p-4 align-middle font-mono text-sm">{order.sku}</td>
-                      <td className="p-4 align-middle text-right">{formatCurrency(order.revenue)}</td>
-                      <td className="p-4 align-middle text-right">{formatCurrency(order.profit)}</td>
-                      <td className="p-4 align-middle text-right">{order.margin.toFixed(2)}%</td>
+                  filteredOrders.map((order, index) => (
+                    <tr 
+                      key={order.id} 
+                      className={`
+                        border-b border-border transition-colors
+                        ${index % 2 === 0 ? 'bg-card' : 'bg-muted/30'}
+                        hover:bg-muted/50
+                      `}
+                    >
+                      <td className="p-4 align-middle text-foreground">{formatDate(order.date)}</td>
+                      <td className="p-4 align-middle text-foreground font-medium">{order.marketplace}</td>
+                      <td className="p-4 align-middle text-foreground">{order.store}</td>
+                      <td className="p-4 align-middle font-mono text-sm text-muted-foreground">{order.sku}</td>
+                      <td className="p-4 align-middle text-right font-semibold text-foreground">{formatCurrency(order.revenue)}</td>
+                      <td className="p-4 align-middle text-right font-semibold text-success">{formatCurrency(order.profit)}</td>
+                      <td className="p-4 align-middle text-right font-medium text-foreground">{order.margin.toFixed(2)}%</td>
                     </tr>
                   ))
                 )}

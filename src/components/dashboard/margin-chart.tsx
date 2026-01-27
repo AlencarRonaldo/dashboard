@@ -30,7 +30,7 @@ export function MarginChart({ data }: MarginChartProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={data} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
             <XAxis 
               type="number"
               tickFormatter={(value) => `${value}%`}
@@ -39,7 +39,7 @@ export function MarginChart({ data }: MarginChartProps) {
             <Tooltip 
               formatter={(value: number) => `${value.toFixed(2)}%`}
             />
-            <Bar dataKey="margin" fill="#8884d8" name="Margem (%)" />
+            <Bar dataKey="margin" fill="#8B5CF6" name="Margem (%)" radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

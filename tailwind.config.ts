@@ -19,6 +19,7 @@ const config: Config = {
     },
     extend: {
       colors: {
+        // Cores base
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -51,6 +52,40 @@ const config: Config = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        // Cores semânticas
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        // Cores por marketplace
+        meli: {
+          DEFAULT: "hsl(var(--meli-primary))",
+          hover: "hsl(var(--meli-hover))",
+          bg: "hsl(var(--meli-bg))",
+          text: "hsl(var(--meli-text))",
+        },
+        shopee: {
+          DEFAULT: "hsl(var(--shopee-primary))",
+          hover: "hsl(var(--shopee-hover))",
+          bg: "hsl(var(--shopee-bg))",
+          text: "hsl(var(--shopee-text))",
+        },
+        shein: {
+          DEFAULT: "hsl(var(--shein-primary))",
+          hover: "hsl(var(--shein-hover))",
+          bg: "hsl(var(--shein-bg))",
+          text: "hsl(var(--shein-text))",
+        },
+        tiktok: {
+          DEFAULT: "hsl(var(--tiktok-primary))",
+          hover: "hsl(var(--tiktok-hover))",
+          bg: "hsl(var(--tiktok-bg))",
+          text: "hsl(var(--tiktok-text))",
         },
       },
       borderRadius: {

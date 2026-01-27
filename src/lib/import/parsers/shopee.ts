@@ -28,13 +28,41 @@ class ShopeeParser implements MarketplaceParser {
   }
 
   private isShopeeSheet(headerRow: string[]): boolean {
-    const shopeeIndicators = ['order id', 'orderid', 'id do pedido', 'pedido', 'shopee', 'order sn', 'ordersn'];
+    const shopeeIndicators = [
+      'order id', 'orderid', 'id do pedido', 'pedido', 'shopee', 
+      'order sn', 'ordersn', 'order_sn', 'order_sn', 'número do pedido',
+      'numero do pedido', 'nº do pedido'
+    ];
     const headerText = headerRow.join(' ').toLowerCase();
-    const hasIndicator = shopeeIndicators.some(indicator => headerText.includes(indicator));
-    const hasShopeeColumns = 
-      (headerRow.some(h => h.includes('order') && h.includes('id')) || headerRow.some(h => h.includes('pedido') && h.includes('id'))) &&
-      (headerRow.some(h => h.includes('date') || h.includes('data') || h.includes('time')));
-    return hasIndicator || hasShopeeColumns;
+    const hasIndicator = shopeeIndicators.some(indicator => headerText.includes(indicator.toLowerCase()));
+    
+    const hasOrderColumn = headerRow.some(h => {
+      const hLower = String(h || '').toLowerCase();
+      return (
+        (hLower.includes('order') && hLower.includes('id')) ||
+        (hLower.includes('pedido') && (hLower.includes('id') || hLower.includes('nº') || hLower.includes('numero'))) ||
+        hLower.includes('order sn') ||
+        hLower.includes('order_sn')
+      );
+    });
+    
+    const hasDateColumn = headerRow.some(h => {
+      const hLower = String(h || '').toLowerCase();
+      return hLower.includes('date') || hLower.includes('data') || hLower.includes('time') || hLower.includes('criação');
+    });
+    
+    const hasShopeeColumns = hasOrderColumn && hasDateColumn;
+    
+    const result = hasIndicator || hasShopeeColumns;
+    
+    if (!result) {
+      console.log('[ShopeeParser] Não identificado. Verificações:');
+      console.log('  - Indicadores encontrados:', hasIndicator);
+      console.log('  - Coluna de pedido encontrada:', hasOrderColumn);
+      console.log('  - Coluna de data encontrada:', hasDateColumn);
+    }
+    
+    return result;
   }
 
   private mapColumns(headerRow: string[]): any {

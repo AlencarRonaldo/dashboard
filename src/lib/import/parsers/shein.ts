@@ -55,13 +55,41 @@ class SheinParser implements MarketplaceParser {
   }
 
   private isSheinSheet(headerRow: string[]): boolean {
-    const sheinIndicators = ['order no', 'orderno', 'order number', 'shein', 'order id', 'pedido'];
+    const sheinIndicators = [
+      'order no', 'orderno', 'order number', 'order number', 'order id', 
+      'shein', 'pedido', 'order_id', 'order_no', 'order_number',
+      'número do pedido', 'numero do pedido', 'nº do pedido'
+    ];
     const headerText = headerRow.join(' ').toLowerCase();
-    const hasIndicator = sheinIndicators.some(indicator => headerText.includes(indicator));
-    const hasSheinColumns = 
-      (headerRow.some(h => (h.includes('order') && (h.includes('no') || h.includes('number') || h.includes('id'))) || h.includes('order no'))) &&
-      (headerRow.some(h => h.includes('time') || h.includes('date') || h.includes('data')));
-    return hasIndicator || hasSheinColumns;
+    const hasIndicator = sheinIndicators.some(indicator => headerText.includes(indicator.toLowerCase()));
+    
+    const hasOrderColumn = headerRow.some(h => {
+      const hLower = String(h || '').toLowerCase();
+      return (
+        hLower.includes('order') && (hLower.includes('no') || hLower.includes('number') || hLower.includes('id')) ||
+        hLower.includes('order no') ||
+        hLower.includes('pedido') && (hLower.includes('nº') || hLower.includes('numero') || hLower.includes('número'))
+      );
+    });
+    
+    const hasDateColumn = headerRow.some(h => {
+      const hLower = String(h || '').toLowerCase();
+      return hLower.includes('time') || hLower.includes('date') || hLower.includes('data') || hLower.includes('criação');
+    });
+    
+    const hasSheinColumns = hasOrderColumn && hasDateColumn;
+    
+    const result = hasIndicator || hasSheinColumns;
+    
+    if (!result) {
+      console.log('[SheinParser] Não identificado. Verificações:');
+      console.log('  - Indicadores encontrados:', hasIndicator);
+      console.log('  - Coluna de pedido encontrada:', hasOrderColumn);
+      console.log('  - Coluna de data encontrada:', hasDateColumn);
+      console.log('  - Texto do cabeçalho:', headerText.substring(0, 200));
+    }
+    
+    return result;
   }
 
   private mapColumns(headerRow: string[]): any {
