@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { createClient } from '@/lib/supabase/utils';
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,23 +21,35 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
-    // Simulação de login - substitua pela lógica real de autenticação
     try {
-      // Aqui você faria a chamada para sua API de autenticação
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Por enquanto, apenas redireciona
-      router.push('/dashboard');
-    } catch (err) {
-      setError('Credenciais inválidas. Tente novamente.');
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        setError(authError.message || 'Credenciais inválidas. Tente novamente.');
+        return;
+      }
+
+      if (data?.session) {
+        // Login bem-sucedido, redireciona para o dashboard
+        router.push('/dashboard');
+        router.refresh(); // Força atualização para aplicar middleware
+      } else {
+        setError('Não foi possível criar a sessão. Tente novamente.');
+      }
+    } catch (err: any) {
+      console.error('Erro no login:', err);
+      setError(err?.message || 'Erro ao fazer login. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-900 p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-white p-4">
+      <Card className="w-full max-w-md bg-white shadow-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Login</CardTitle>
           <CardDescription>

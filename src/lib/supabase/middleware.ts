@@ -28,14 +28,7 @@ export const createMiddlewareClient = (
             value,
             ...options,
           });
-
-          const nextResponse = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-
-          nextResponse.cookies.set({
+          response.cookies.set({
             name,
             value,
             ...options,
@@ -48,14 +41,7 @@ export const createMiddlewareClient = (
             value: '',
             ...options,
           });
-
-          const nextResponse = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-
-          nextResponse.cookies.set({
+          response.cookies.set({
             name,
             value: '',
             ...options,

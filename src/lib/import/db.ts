@@ -1,4 +1,4 @@
-import { createServer } from '@/lib/supabase/utils';
+import { createServer } from '@/lib/supabase/server';
 import { Database } from '@/types/supabase';
 import { MarketplaceName, NormalizedOrder } from './types';
 import type { SupabaseClient } from '@supabase/supabase-js';

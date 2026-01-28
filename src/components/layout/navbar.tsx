@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Upload, History, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { createClient } from '@/lib/supabase/utils';
+import { useState } from 'react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -14,6 +16,31 @@ const navigation = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Erro ao fazer logout:', error);
+        alert('Erro ao fazer logout. Tente novamente.');
+        return;
+      }
+      
+      // Redireciona para a página de login após logout
+      router.push('/login');
+      router.refresh(); // Força atualização para limpar cache
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      alert('Erro ao fazer logout. Tente novamente.');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <nav className="border-b bg-background">
@@ -45,9 +72,14 @@ export function Navbar() {
               })}
             </div>
           </div>
-          <Button variant="ghost" size="sm">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+          >
             <LogOut className="h-4 w-4 mr-2" />
-            Sair
+            {isLoggingOut ? 'Saindo...' : 'Sair'}
           </Button>
         </div>
       </div>
