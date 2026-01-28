@@ -1,0 +1,342 @@
+import { MarketplaceName, NormalizedOrder } from '../types';
+import meliParser from './meli';
+import shopeeParser from './shopee';
+import sheinParser from './shein';
+import tiktokParser from './tiktok';
+
+// Mapeia os nomes dos marketplaces para suas respectivas implementações de parser
+const parsers = {
+  meli: meliParser,
+  shopee: shopeeParser,
+  shein: sheinParser,
+  tiktok: tiktokParser,
+};
+
+// Resultado da detecção e do parsing
+interface ParserResult {
+  marketplaceName: MarketplaceName;
+  normalizedData: NormalizedOrder[];
+}
+
+/**
+ * Tentativa de detecção para planilhas no formato "hub" (ex: UpSeller),
+ * onde o cabeçalho é algo como:
+ *
+ *   Ordenado | Liquidação | Nº de Pedido de UpSeller | Nº de Pedido de Plataforma | Plataforma | Loja | Valor do Pedido | ...
+ *
+ * Nesses casos, a coluna "Plataforma" indica o marketplace (ex: "Mercado Livre", "Shopee", "Shein", "TikTok").
+ * Caso a coluna Plataforma venha vazia, tentamos inferir o marketplace pelo nome do arquivo.
+ */
+function tryDetectUpsellerFormat(rows: any[][], fileName?: string): ParserResult | null {
+  if (!rows || rows.length < 2) return null;
+
+  const headerRaw = rows[0];
+  const header = headerRaw.map((h) => String(h || '').trim());
+  const headerLower = header.map((h) => h.toLowerCase());
+
+  // Checa se o cabeçalho tem a assinatura típica de relatórios de hub (ex.: UpSeller)
+  const hasUpsellerPattern =
+    headerLower.some((h) => h.includes('nº de pedido de upseller') || h.includes('no de pedido de upseller')) ||
+    (headerLower.some((h) => h.includes('plataforma')) &&
+      headerLower.some(
+        (h) =>
+          h.includes('nº de pedido de plataforma') ||
+          h.includes('no de pedido de plataforma') ||
+          (h.includes('pedido') && h.includes('plataforma'))
+      ));
+
+  if (!hasUpsellerPattern) {
+    return null;
+  }
+
+  console.log('[detectAndParse][UpSeller] Formato de hub detectado. Cabeçalho:', header);
+
+  const idxPlatform = headerLower.findIndex((h) => h.includes('plataforma'));
+  const idxLoja = headerLower.findIndex((h) => h.includes('loja'));
+  const idxOrderId =
+    headerLower.findIndex((h) => h.includes('nº de pedido de plataforma')) !== -1
+      ? headerLower.findIndex((h) => h.includes('nº de pedido de plataforma'))
+      : headerLower.findIndex((h) => h.includes('pedido') && h.includes('plataforma'));
+  const idxExternalId = headerLower.findIndex((h) => h.includes('nº de pedido de upseller'));
+  const idxOrderDate =
+    headerLower.findIndex((h) => h.includes('ordenado')) !== -1
+      ? headerLower.findIndex((h) => h.includes('ordenado'))
+      : headerLower.findIndex((h) => (h.includes('data') && h.includes('pedido')) || h.includes('order date'));
+  const idxSettlementDate = headerLower.findIndex((h) => h.includes('liquidação') || h.includes('liquidacao'));
+  const idxOrderValue = headerLower.findIndex((h) => h.includes('valor do pedido'));
+
+  // Receita pode vir como "Valor de Liquidação" ou "Receita"
+  let idxRevenue = headerLower.findIndex(
+    (h) => h.includes('valor de liquidação') || h.includes('valor de liquidacao')
+  );
+  if (idxRevenue === -1) {
+    idxRevenue = headerLower.findIndex((h) => h.includes('receita'));
+  }
+
+  const idxProductSales = headerLower.findIndex((h) => h.includes('vendas de produtos'));
+  const idxOtherRevenue = headerLower.findIndex((h) => h.includes('outras receitas'));
+  const idxCommissions = headerLower.findIndex(
+    (h) =>
+      h.includes('comissão de vendas') ||
+      h.includes('comissao de vendas') ||
+      h.includes('comissão') ||
+      h.includes('comissao')
+  );
+  const idxFreightPaidByBuyer = headerLower.findIndex((h) =>
+    h.includes('taxa de frete paga pelo comprador')
+  );
+  const idxFreightFee = headerLower.findIndex((h) => h.includes('taxa do frete'));
+  const idxOtherPlatformFee = headerLower.findIndex((h) => h.includes('outra taxa da plataforma'));
+
+  if (idxPlatform === -1 || idxOrderId === -1 || idxOrderDate === -1) {
+    console.warn('[detectAndParse][UpSeller] Não foi possível mapear colunas obrigatórias (Plataforma / Pedido / Data).');
+    console.warn('[detectAndParse][UpSeller] idxPlatform:', idxPlatform, 'idxOrderId:', idxOrderId, 'idxOrderDate:', idxOrderDate);
+    return null;
+  }
+
+  // Encontra o marketplace. A ordem de prioridade é:
+  // 1. Coluna 'Plataforma' (se não for um ID numérico)
+  // 2. Coluna 'Loja'
+  // 3. Nome do arquivo
+  let sourceForMarketplace = '';
+  let marketplaceName: MarketplaceName | null = null;
+  let platformValue = '';
+
+  // 1. Tenta a coluna 'Plataforma'
+  const platformValueRaw = rows[1]?.[idxPlatform] ? String(rows[1][idxPlatform]).trim() : '';
+
+  // Se o valor da plataforma parece um ID longo, é mais provável que seja um ID de loja do que um nome.
+  const isPlatformValueAnId = /^\d{10,}$/.test(platformValueRaw);
+
+  if (platformValueRaw && !isPlatformValueAnId) {
+    sourceForMarketplace = platformValueRaw.toLowerCase();
+    platformValue = sourceForMarketplace; // Guarda o valor para filtragem
+    console.log(`[detectAndParse][UpSeller] Usando coluna 'Plataforma' para detecção: '${sourceForMarketplace}'`);
+  } else {
+    // 2. Se a coluna 'Plataforma' está vazia ou é um ID, tenta a coluna 'Loja'
+    if (idxLoja !== -1) {
+      const lojaValueRaw = rows[1]?.[idxLoja] ? String(rows[1][idxLoja]).trim() : '';
+      if (lojaValueRaw) {
+        sourceForMarketplace = lojaValueRaw.toLowerCase();
+        // Neste caso, não podemos filtrar pela coluna 'Plataforma', pois ela contém um ID.
+        // A filtragem deve ser feita pela coluna 'Loja'.
+        console.log(`[detectAndParse][UpSeller] Coluna 'Plataforma' é ID ou vazia. Usando coluna 'Loja': '${sourceForMarketplace}'`);
+      }
+    }
+  }
+
+  // Identifica o marketplace com base na fonte encontrada
+  if (sourceForMarketplace) {
+    if (sourceForMarketplace.includes('mercado') || sourceForMarketplace.includes('ml')) {
+      marketplaceName = 'meli';
+    } else if (sourceForMarketplace.includes('shopee')) {
+      marketplaceName = 'shopee';
+    } else if (sourceForMarketplace.includes('shein')) {
+      marketplaceName = 'shein';
+    } else if (sourceForMarketplace.includes('tiktok') || sourceForMarketplace.includes('tik tok')) {
+      marketplaceName = 'tiktok';
+    }
+  }
+
+  // 3. Se ainda não encontrou, tenta o nome do arquivo como fallback
+  if (!marketplaceName && fileName) {
+    console.log(`[detectAndParse][UpSeller] Não foi possível detectar pelas colunas. Usando nome do arquivo: '${fileName}'`);
+    const fn = fileName.toLowerCase();
+    if (fn.includes('meli') || fn.includes('mercado')) {
+      marketplaceName = 'meli';
+    } else if (fn.includes('shopee')) {
+      marketplaceName = 'shopee';
+    } else if (fn.includes('shein')) {
+      marketplaceName = 'shein';
+    } else if (fn.includes('tiktok') || fn.includes('tik tok')) {
+      marketplaceName = 'tiktok';
+    }
+  }
+
+  if (!marketplaceName) {
+    const lojaValueRaw = idxLoja !== -1 && rows[1]?.[idxLoja] ? String(rows[1][idxLoja]).trim() : '(não encontrada)';
+    throw new Error(
+      `[UpSeller] Não foi possível identificar o marketplace a partir da coluna 'Plataforma' ('${platformValueRaw}'), da coluna 'Loja' ('${lojaValueRaw}'), ou do nome do arquivo.` +
+      `\nOs valores suportados devem conter 'mercado', 'shopee', 'shein', ou 'tiktok'.`
+    );
+  }
+  
+  // A lógica de filtragem original que dependia de 'platformValue' precisa ser ajustada.
+  // Se usamos a coluna 'Loja' ou o nome do arquivo, não podemos mais filtrar pela coluna 'Plataforma'.
+  const shouldFilterByPlatform = platformValueRaw && !isPlatformValueAnId;
+
+  console.log(`[detectAndParse][UpSeller] Plataforma detectada: ${marketplaceName}`);
+
+  const parseDate = (value: any): Date | undefined => {
+    if (!value) return undefined;
+    if (value instanceof Date) return value;
+    if (typeof value === 'string') {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? undefined : d;
+    }
+    if (typeof value === 'number') {
+      // Serial date do Excel (dias desde 1899-12-30/31)
+      const d = new Date(Math.round((value - 25569) * 86400 * 1000));
+      return isNaN(d.getTime()) ? undefined : d;
+    }
+    return undefined;
+  };
+
+  const parseNumber = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    const s = String(value)
+      // remove símbolos de moeda e espaços
+      .replace(/[R$\s]/gi, '')
+      // remove separadores de milhar
+      .replace(/\./g, '')
+      // troca vírgula decimal por ponto
+      .replace(/,/g, '.');
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const normalized: NormalizedOrder[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length === 0) continue;
+
+    if (shouldFilterByPlatform) {
+      const rowPlatform = String(row[idxPlatform] ?? '').toLowerCase().trim();
+      if (!rowPlatform || !rowPlatform.includes(platformValue)) {
+        // Linha de outro marketplace → ignora
+        continue;
+      }
+    }
+
+    const rawOrderId = row[idxOrderId];
+    const rawExternalId = idxExternalId !== -1 ? row[idxExternalId] : undefined;
+    const rawOrderDate = row[idxOrderDate];
+    const rawSettlement = idxSettlementDate !== -1 ? row[idxSettlementDate] : undefined;
+
+    const orderDate = parseDate(rawOrderDate);
+    if (!rawOrderId || !orderDate) {
+      console.warn('[detectAndParse][UpSeller] Linha ignorada por falta de ID ou data válida:', {
+        rawOrderId,
+        rawOrderDate,
+      });
+      continue;
+    }
+
+    const orderValue = idxOrderValue !== -1 ? parseNumber(row[idxOrderValue]) : 0;
+    const revenueBase = idxRevenue !== -1 ? parseNumber(row[idxRevenue]) : 0;
+    const productSales = idxProductSales !== -1 ? parseNumber(row[idxProductSales]) : undefined;
+    const otherRevenue = idxOtherRevenue !== -1 ? parseNumber(row[idxOtherRevenue]) : 0;
+    const commissions = idxCommissions !== -1 ? parseNumber(row[idxCommissions]) : undefined;
+    const freightPaidByBuyer =
+      idxFreightPaidByBuyer !== -1 ? parseNumber(row[idxFreightPaidByBuyer]) : undefined;
+    const freightFee = idxFreightFee !== -1 ? parseNumber(row[idxFee]) : undefined;
+    const otherPlatformFee =
+      idxOtherPlatformFee !== -1 ? parseNumber(row[idxOtherPlatformFee]) : undefined;
+
+    const revenue = revenueBase || (productSales ?? 0) + otherRevenue;
+    const refunds = 0; // coluna de devolução não presente no cabeçalho fornecido
+    const productCost = undefined; // não há coluna de custo na amostra de cabeçalho enviada
+
+    const feesSum = (freightFee ?? 0) + (otherPlatformFee ?? 0);
+
+    let profit: number | undefined;
+    let profitMargin: number | undefined;
+    const baseRevenue = revenue ?? productSales ?? orderValue;
+    if (baseRevenue !== undefined) {
+      const commissionsValue = commissions ?? 0;
+      const costValue = productCost ?? 0;
+      const refundsValue = refunds ?? 0;
+      const totalFees = commissionsValue + feesSum;
+      profit = baseRevenue - costValue - totalFees - (refundsValue || 0);
+      profitMargin = baseRevenue > 0 ? (profit / baseRevenue) * 100 : 0;
+    }
+
+    normalized.push({
+      platform_order_id: String(rawOrderId),
+      external_order_id: rawExternalId ? String(rawExternalId) : undefined,
+      order_date: orderDate,
+      settlement_date: rawSettlement ? parseDate(rawSettlement) : undefined,
+      sku: 'N/A', // planilha de exemplo não possui coluna de SKU visível
+      quantity: 1,
+      order_value: orderValue || baseRevenue || 0,
+      revenue: baseRevenue,
+      product_sales: productSales,
+      commissions,
+      fees: feesSum || undefined,
+      refunds: refunds || undefined,
+      product_cost: productCost,
+      profit,
+      profit_margin: profitMargin,
+    });
+  }
+
+  if (normalized.length === 0) {
+    console.warn('[detectAndParse][UpSeller] Nenhuma linha válido encontrada para o marketplace detectado.');
+    return null;
+  }
+
+  console.log(`[detectAndParse][UpSeller] ✅ ${normalized.length} pedidos normalizados para ${marketplaceName}`);
+  return {
+    marketplaceName,
+    normalizedData: normalized,
+  };
+}
+
+/**
+ * Tenta identificar o marketplace e fazer o parsing dos dados da planilha.
+ */
+export function detectAndParse(rows: any[][], fileName?: string): ParserResult | null {
+  if (!rows || rows.length === 0) {
+    console.warn('[detectAndParse] Planilha vazia ou sem dados.');
+    return null;
+  }
+
+  // Mostra o cabeçalho para debug
+  if (rows.length > 0) {
+    const headerRow = rows[0];
+    console.log('[detectAndParse] Cabeçalho da planilha:', headerRow);
+    console.log('[detectAndParse] Cabeçalho (normalizado):', headerRow.map((h: any) => String(h || '').toLowerCase().trim()));
+  }
+
+  // 1) Tentar primeiro o formato "hub" (ex: UpSeller)
+  try {
+    const upsellerResult = tryDetectUpsellerFormat(rows, fileName);
+    if (upsellerResult) {
+      return upsellerResult;
+    }
+  } catch (error: any) {
+    // Se o tryDetectUpsellerFormat lançar um erro (ex: marketplace não suportado), propaga o erro.
+    throw error;
+  }
+
+
+  // 2) Caso não seja UpSeller, iterar sobre os parsers específicos
+  const parserNames = Object.keys(parsers);
+  console.log(`[detectAndParse] Tentando ${parserNames.length} parsers: ${parserNames.join(', ')}`);
+  
+  for (const [name, parser] of Object.entries(parsers)) {
+    try {
+      console.log(`[detectAndParse] Tentando parser: ${name}...`);
+      const normalizedData = parser.parse(rows);
+      if (normalizedData) {
+        console.log(`[detectAndParse] ✅ Marketplace identificado: ${name} (${normalizedData.length} pedidos)`);
+        return {
+          marketplaceName: name as MarketplaceName,
+          normalizedData,
+        };
+      } else {
+        console.log(`[detectAndParse] Parser ${name} não identificou a planilha`);
+      }
+    } catch (error: any) {
+      console.error(`[detectAndParse] Erro ao tentar o parser '${name}':`, error?.message || error);
+      console.error(`[detectAndParse] Stack do parser ${name}:`, error?.stack);
+    }
+  }
+
+  console.error('[detectAndParse] ❌ Nenhum parser compatível encontrado para a planilha.');
+  console.error('[detectAndParse] Cabeçalho recebido:', rows[0]);
+  console.error('[detectAndParse] Total de linhas:', rows.length);
+  return null;
+}

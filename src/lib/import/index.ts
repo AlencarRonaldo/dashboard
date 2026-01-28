@@ -101,7 +101,7 @@ export async function processImport(
     if (!result) {
       // Mostra informações detalhadas para ajudar no debug
       const headerRow = rows[0] || [];
-      const headerText = headerRow.map((h: any) => String(h || '')).join(' | ');
+      const headerText = headerRow.map((h: any) => String(h ?? '')).join(' | ');
       
       console.error('[processImport] ❌ Falha na detecção do marketplace');
       console.error('[processImport] Cabeçalho completo:', headerRow);
@@ -110,13 +110,15 @@ export async function processImport(
       
       throw new Error(
         `Não foi possível identificar o marketplace da planilha.\n\n` +
-        `Cabeçalho detectado: ${headerText.substring(0, 200)}\n\n` +
-        `Verifique se o arquivo é de um marketplace suportado:\n` +
-        `- Mercado Livre: deve ter colunas como "Nº de Venda" ou "Venda"\n` +
-        `- Shopee: deve ter colunas como "Order ID" ou "Order SN"\n` +
-        `- Shein: deve ter colunas como "Order No" ou "Order Number"\n` +
-        `- TikTok: deve ter colunas como "Order ID" ou "Order SN"\n\n` +
-        `Todos devem ter uma coluna de data (Date, Time, Data, etc.)`
+        `Cabeçalho detectado: ${headerText.substring(0, 300)}\n\n` +
+        `O sistema suporta:\n` +
+        `1) Layouts nativos dos marketplaces (Mercado Livre, Shopee, Shein, TikTok);\n` +
+        `2) Layouts agregadores (ex.: UpSeller), que tenham pelo menos:\n` +
+        `   - Uma coluna de marketplace, como "Plataforma" (valores: "Mercado", "Shopee", "Shein", "TikTok"...)\n` +
+        `   - Um identificador de pedido, como "Nº de Pedido de Plataforma"\n` +
+        `   - Uma coluna de data (ex.: "Ordenado", "Liquidação", "Data", "Date", "Time")\n\n` +
+        `Regra de aceitação: se houver Data + Pedido + Marketplace, a planilha é importada como agregador.\n` +
+        `Se sua planilha segue esse padrão e o erro continuar, verifique grafia dos nomes das colunas ou envie um exemplo para ajuste fino do parser.`
       );
     }
 

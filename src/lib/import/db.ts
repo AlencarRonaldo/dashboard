@@ -173,69 +173,79 @@ export async function saveDataToDatabase(
     let skippedCount = 0;
     const errors: string[] = [];
 
-    // 2. Processar cada pedido normalizado
-    console.log(`[saveDataToDatabase] Iniciando processamento de ${normalizedData.length} pedidos...`);
-    
-    for (let index = 0; index < normalizedData.length; index++) {
-      const item = normalizedData[index];
-      
+    // 2. Remove duplicatas em memória ANTES de processar (evita queries desnecessárias)
+    const seenOrderIds = new Set<string>();
+    const uniqueOrders = normalizedData.filter((item) => {
+      if (!item.platform_order_id) return false;
+      const key = `${item.platform_order_id}_${finalStoreId}`;
+      if (seenOrderIds.has(key)) {
+        console.log(`[saveDataToDatabase] Duplicata em memória ignorada: ${item.platform_order_id}`);
+        return false;
+      }
+      seenOrderIds.add(key);
+      return true;
+    });
+
+    console.log(
+      `[saveDataToDatabase] Iniciando processamento: ${normalizedData.length} pedidos totais, ${uniqueOrders.length} únicos após remoção de duplicatas em memória.`
+    );
+
+    // 3. Busca TODOS os pedidos existentes de uma vez (otimização)
+    const { data: existingOrdersData } = await supabase
+      .from('orders')
+      .select('platform_order_id, order_date')
+      .eq('store_id', finalStoreId);
+
+    const existingOrdersSet = new Set(
+      (existingOrdersData || []).map((o) => `${o.platform_order_id}_${finalStoreId}`)
+    );
+
+    console.log(
+      `[saveDataToDatabase] Encontrados ${existingOrdersSet.size} pedidos já existentes no banco para esta loja.`
+    );
+
+    // 4. Processar cada pedido normalizado (apenas os únicos)
+    for (let index = 0; index < uniqueOrders.length; index++) {
+      const item = uniqueOrders[index];
+
+      // Log de progresso a cada 50 pedidos
+      if ((index + 1) % 50 === 0 || index === 0) {
+        console.log(
+          `[saveDataToDatabase] Progresso: ${index + 1}/${uniqueOrders.length} (${Math.round(((index + 1) / uniqueOrders.length) * 100)}%)`
+        );
+      }
+
       try {
         // Validação básica dos dados
         if (!item.platform_order_id) {
           errors.push(`Pedido na posição ${index + 1} não tem platform_order_id. Ignorando.`);
           console.warn(`[saveDataToDatabase] Pedido na posição ${index + 1} sem platform_order_id`);
-          continue;
-        }
-        
-        if (!item.order_date || !(item.order_date instanceof Date) || isNaN(item.order_date.getTime())) {
-          errors.push(`Pedido ${item.platform_order_id} tem data inválida. Ignorando.`);
-          console.warn(`[saveDataToDatabase] Pedido ${item.platform_order_id} com data inválida:`, item.order_date);
-          continue;
-        }
-        
-        // Verifica se já existe um pedido com o mesmo platform_order_id e store_id
-        // Usa maybeSingle() para não lançar erro se não encontrar
-        const { data: existingOrder } = await supabase
-          .from('orders')
-          .select('id, order_date')
-          .eq('store_id', finalStoreId)
-          .eq('platform_order_id', item.platform_order_id)
-          .maybeSingle();
-
-        // Se já existe, pula este pedido (evita duplicação)
-        if (existingOrder) {
-          const existingDate = new Date(existingOrder.order_date).toISOString().split('T')[0];
-          const newDate = new Date(item.order_date).toISOString().split('T')[0];
-          console.log(`Pedido ${item.platform_order_id} já existe na loja (data existente: ${existingDate}, nova: ${newDate}). Ignorando.`);
           skippedCount++;
           continue;
         }
 
-        // Verifica se existe pedido na mesma data (mesmo dia) com mesmo platform_order_id
-        // Normaliza a data para comparar apenas o dia (sem hora)
-        const orderDateOnly = new Date(item.order_date);
-        orderDateOnly.setHours(0, 0, 0, 0);
-        const orderDateEnd = new Date(item.order_date);
-        orderDateEnd.setHours(23, 59, 59, 999);
+        if (!item.order_date || !(item.order_date instanceof Date) || isNaN(item.order_date.getTime())) {
+          errors.push(`Pedido ${item.platform_order_id} tem data inválida. Ignorando.`);
+          console.warn(`[saveDataToDatabase] Pedido ${item.platform_order_id} com data inválida:`, item.order_date);
+          skippedCount++;
+          continue;
+        }
 
-        // Verifica se já existe pedido na mesma data com mesmo platform_order_id
-        const { data: existingByDate } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('store_id', finalStoreId)
-          .eq('platform_order_id', item.platform_order_id)
-          .gte('order_date', orderDateOnly.toISOString())
-          .lte('order_date', orderDateEnd.toISOString())
-          .maybeSingle();
-
-        if (existingByDate) {
-          console.log(`Pedido ${item.platform_order_id} já existe na data ${orderDateOnly.toISOString().split('T')[0]}. Ignorando.`);
+        // Verificação rápida em memória (já carregamos todos os existentes)
+        const orderKey = `${item.platform_order_id}_${finalStoreId}`;
+        if (existingOrdersSet.has(orderKey)) {
+          console.log(
+            `[saveDataToDatabase] Pedido ${item.platform_order_id} já existe no banco. Ignorando.`
+          );
           skippedCount++;
           continue;
         }
 
         // 3. Inserir o pedido principal
-        console.log(`[saveDataToDatabase] Tentando inserir pedido ${item.platform_order_id}...`);
+        // Log apenas a cada 10 pedidos para não poluir o console
+        if (insertedCount % 10 === 0) {
+          console.log(`[saveDataToDatabase] Processando pedido ${index + 1}/${uniqueOrders.length}: ${item.platform_order_id}...`);
+        }
         const { data: order, error: orderError } = await supabase
           .from('orders')
           .insert({
@@ -258,7 +268,9 @@ export async function saveDataToDatabase(
           
           // Se o erro for de duplicidade, ignora e continua
           if (orderError.code === '23505') {
-            console.log(`Pedido ${item.platform_order_id} já existe (constraint). Ignorando.`);
+            console.log(`Pedido ${item.platform_order_id} já existe (constraint UNIQUE). Ignorando.`);
+            // Adiciona ao Set para evitar reprocessamento
+            existingOrdersSet.add(orderKey);
             skippedCount++;
             continue;
           }
@@ -281,7 +293,8 @@ export async function saveDataToDatabase(
           continue;
         }
         
-        console.log(`[saveDataToDatabase] Pedido ${item.platform_order_id} inserido com sucesso. ID: ${order.id}`);
+        // Adiciona ao Set em memória para evitar reprocessamento
+        existingOrdersSet.add(orderKey);
 
         // 4. Inserir os itens do pedido
         const orderItem: OrderItem = {
@@ -300,26 +313,107 @@ export async function saveDataToDatabase(
           // Continua mesmo com erro no item, mas não conta como inserido
           continue;
         }
-        console.log(`[saveDataToDatabase] Item do pedido ${item.platform_order_id} inserido com sucesso`);
 
         // 5. Inserir os dados financeiros do pedido
         // Garante que order_value seja um número válido (obrigatório)
-        const orderValue = typeof item.order_value === 'number' && !isNaN(item.order_value) 
+        const orderValue = typeof item.order_value === 'number' && !isNaN(item.order_value) && item.order_value > 0
           ? item.order_value 
-          : (typeof item.revenue === 'number' && !isNaN(item.revenue) ? item.revenue : 0);
+          : (typeof item.revenue === 'number' && !isNaN(item.revenue) && item.revenue > 0 ? item.revenue : 0);
+        
+        // Calcula revenue - prioriza item.revenue, depois product_sales, depois order_value
+        let revenue = 0;
+        if (typeof item.revenue === 'number' && !isNaN(item.revenue) && item.revenue > 0) {
+          revenue = item.revenue;
+        } else if (typeof item.product_sales === 'number' && !isNaN(item.product_sales) && item.product_sales > 0) {
+          revenue = item.product_sales;
+        } else if (orderValue > 0) {
+          revenue = orderValue;
+        }
+        
+        // Calcula custos e taxas para validação
+        const productCost = typeof item.product_cost === 'number' && !isNaN(item.product_cost) ? item.product_cost : 0;
+        // Comissões podem vir como negativas (descontos), então usa valor absoluto
+        const commissions = typeof item.commissions === 'number' && !isNaN(item.commissions) ? Math.abs(item.commissions) : 0;
+        const fees = typeof item.fees === 'number' && !isNaN(item.fees) ? item.fees : 0;
+        const refunds = typeof item.refunds === 'number' && !isNaN(item.refunds) && item.refunds > 0 ? item.refunds : 0;
+        
+        // Calcula o lucro correto baseado nos custos
+        // Lucro = Receita - Custo do Produto - Comissões (absoluto) - Taxas - Reembolsos
+        const calculatedProfit = revenue > 0 
+          ? revenue - productCost - commissions - fees - refunds 
+          : 0;
+        
+        // Calcula profit - valida se o valor do item está consistente
+        let profit = null;
+        if (typeof item.profit === 'number' && !isNaN(item.profit)) {
+          // Valida: lucro não pode ser maior que receita
+          if (item.profit > revenue && revenue > 0) {
+            console.warn(`[saveDataToDatabase] ⚠️ Lucro inconsistente para pedido ${item.platform_order_id}: lucro=${item.profit}, receita=${revenue}. Recalculando...`);
+            profit = calculatedProfit;
+          } else if (revenue > 0 && Math.abs(item.profit - calculatedProfit) > revenue * 0.05) {
+            // Se a diferença for maior que 5% da receita, recalcula
+            console.warn(`[saveDataToDatabase] ⚠️ Lucro muito diferente do calculado para pedido ${item.platform_order_id}: lucro=${item.profit}, calculado=${calculatedProfit}. Usando calculado.`);
+            profit = calculatedProfit;
+          } else {
+            // Lucro parece válido
+            profit = item.profit;
+          }
+        } else if (revenue > 0) {
+          // Não tem lucro no item, calcula
+          profit = calculatedProfit;
+        }
+        
+        // Garantia final: lucro nunca pode ser maior que receita
+        if (profit !== null && profit > revenue && revenue > 0) {
+          console.warn(`[saveDataToDatabase] ⚠️ Correção final: lucro (${profit}) > receita (${revenue}) para pedido ${item.platform_order_id}. Ajustando...`);
+          profit = calculatedProfit;
+        }
+        
+        // Calcula profit_margin se não estiver presente
+        let profitMargin = null;
+        if (typeof item.profit_margin === 'number' && !isNaN(item.profit_margin)) {
+          // Valida margem: não pode ser maior que 100%
+          if (item.profit_margin > 100 && revenue > 0) {
+            console.warn(`[saveDataToDatabase] ⚠️ Margem inválida (${item.profit_margin}%) para pedido ${item.platform_order_id}. Recalculando...`);
+            profitMargin = revenue > 0 && profit !== null ? (profit / revenue) * 100 : 0;
+          } else {
+            profitMargin = item.profit_margin;
+          }
+        } else if (revenue > 0 && profit !== null && profit !== undefined) {
+          profitMargin = (profit / revenue) * 100;
+          // Limita margem a 100%
+          if (profitMargin > 100) {
+            profitMargin = 100;
+          }
+        }
         
         const financials: OrderFinancials = {
           order_id: order.id,
-          order_value: orderValue,
-          revenue: typeof item.revenue === 'number' && !isNaN(item.revenue) ? item.revenue : orderValue,
+          order_value: orderValue > 0 ? orderValue : revenue,
+          revenue: revenue > 0 ? revenue : (orderValue > 0 ? orderValue : 0),
           product_sales: typeof item.product_sales === 'number' && !isNaN(item.product_sales) ? item.product_sales : null,
-          commissions: typeof item.commissions === 'number' && !isNaN(item.commissions) ? item.commissions : null,
+          // Salva comissões como valor absoluto (sempre positivo no banco)
+          commissions: typeof item.commissions === 'number' && !isNaN(item.commissions) ? Math.abs(item.commissions) : null,
           fees: typeof item.fees === 'number' && !isNaN(item.fees) ? item.fees : null,
           refunds: typeof item.refunds === 'number' && !isNaN(item.refunds) && item.refunds > 0 ? item.refunds : null,
           product_cost: typeof item.product_cost === 'number' && !isNaN(item.product_cost) ? item.product_cost : null,
-          profit: typeof item.profit === 'number' && !isNaN(item.profit) ? item.profit : null,
-          profit_margin: typeof item.profit_margin === 'number' && !isNaN(item.profit_margin) ? item.profit_margin : null,
+          profit: profit,
+          profit_margin: profitMargin,
         };
+        
+        // Log dos primeiros 5 pedidos para debug
+        if (insertedCount < 5) {
+          console.log(`[saveDataToDatabase] Pedido ${item.platform_order_id} - Dados financeiros a serem salvos:`, {
+            revenue: financials.revenue,
+            product_cost: financials.product_cost,
+            commissions: financials.commissions,
+            fees: financials.fees,
+            refunds: financials.refunds,
+            profit: financials.profit,
+            profit_margin: financials.profit_margin,
+            order_value: financials.order_value
+          });
+        }
         const { error: financialsError } = await supabase.from('order_financials').insert(financials);
         if (financialsError) {
           console.error(`[saveDataToDatabase] Erro ao inserir dados financeiros do pedido ${item.platform_order_id}:`, {
@@ -331,10 +425,12 @@ export async function saveDataToDatabase(
           // Continua mesmo com erro nos dados financeiros, mas não conta como inserido
           continue;
         }
-        console.log(`[saveDataToDatabase] Dados financeiros do pedido ${item.platform_order_id} inseridos com sucesso`);
 
         insertedCount++;
-        console.log(`[saveDataToDatabase] ✅ Pedido ${item.platform_order_id} completamente inserido. Total inserido: ${insertedCount}`);
+        // Log apenas a cada 10 inserções ou no final
+        if (insertedCount % 10 === 0 || index === uniqueOrders.length - 1) {
+          console.log(`[saveDataToDatabase] ✅ Progresso: ${insertedCount} pedidos inseridos, ${skippedCount} ignorados`);
+        }
       } catch (itemError: any) {
         // Captura erros individuais e continua processando
         errors.push(`Erro ao processar pedido ${item.platform_order_id}: ${itemError.message}`);

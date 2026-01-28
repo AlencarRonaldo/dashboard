@@ -34,9 +34,17 @@ export async function GET(request: NextRequest) {
           .select('*', { count: 'exact', head: true })
           .eq('import_id', importRecord.id)
 
+        // Transforma snake_case para camelCase e adiciona campos esperados pelo frontend
         return {
-          ...importRecord,
+          id: importRecord.id,
+          date: importRecord.created_at,
+          fileName: importRecord.file_name || '',
+          status: importRecord.status,
           recordsCount: count || 0,
+          errorDetails: importRecord.error_details || null,
+          finishedAt: importRecord.finished_at || null,
+          // marketplace não existe na tabela imports, então fica undefined
+          marketplace: undefined,
         }
       })
     )

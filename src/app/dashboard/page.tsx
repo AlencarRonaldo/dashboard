@@ -11,113 +11,124 @@ import { OrdersTable } from '@/components/dashboard/orders-table';
 import { Select } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
 
-// Dados mockados - substitua pela chamada à API
-const mockOrders = [
-  {
-    id: '1',
-    date: '2024-01-15',
-    marketplace: 'Mercado Livre',
-    store: 'Loja A',
-    sku: 'SKU-001',
-    revenue: 1500,
-    profit: 450,
-    margin: 30,
-  },
-  {
-    id: '2',
-    date: '2024-01-16',
-    marketplace: 'Shopee',
-    store: 'Loja B',
-    sku: 'SKU-002',
-    revenue: 2300,
-    profit: 690,
-    margin: 30,
-  },
-  {
-    id: '3',
-    date: '2024-01-17',
-    marketplace: 'Mercado Livre',
-    store: 'Loja A',
-    sku: 'SKU-003',
-    revenue: 1800,
-    profit: 540,
-    margin: 30,
-  },
-];
+interface DashboardData {
+  kpis: {
+    totalRevenue: number;
+    netRevenue: number;
+    totalProfit: number;
+    averageMargin: number;
+    totalOrders: number;
+    averageTicket: number;
+  };
+  marketplaceStats: Array<{
+    marketplace: string;
+    marketplaceName: string;
+    revenue: number;
+    profit: number;
+    orders: number;
+    margin: number;
+    totalFees?: number;
+    trend: { value: number; isPositive: boolean };
+  }>;
+  revenueData: Array<{ date: string; revenue: number; profit: number }>;
+  marketplaceData: Array<{ marketplace: string; revenue: number; profit: number }>;
+  marginData: Array<{ store: string; margin: number }>;
+  orders: Array<{
+    id: string;
+    platform_order_id: string;
+    date: string;
+    marketplace: string;
+    store: string;
+    sku: string;
+    revenue: number;
+    profit: number;
+    margin: number;
+  }>;
+}
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<'day' | 'month'>('day');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
-    // Simular carregamento de dados
-    setTimeout(() => setIsLoading(false), 1000);
+    async function fetchDashboardData() {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/dashboard');
+        const text = await response.text();
+
+        if (!response.ok) {
+          throw new Error(`Erro ao buscar dados: ${response.status}`);
+        }
+
+        let jsonData;
+        try {
+          jsonData = JSON.parse(text);
+        } catch (parseError) {
+          throw new Error('Resposta inválida do servidor');
+        }
+
+        setData(jsonData);
+      } catch (err: any) {
+        console.error('Erro ao carregar dashboard:', err);
+        setError(err.message || 'Erro ao carregar dados do dashboard');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchDashboardData();
   }, []);
 
-  // Calcular métricas dos dados mockados
-  const totalRevenue = mockOrders.reduce((sum, order) => sum + order.revenue, 0);
-  const totalProfit = mockOrders.reduce((sum, order) => sum + order.profit, 0);
-  const netRevenue = totalRevenue - totalProfit; // Simulação
-  const averageMargin = mockOrders.reduce((sum, order) => sum + order.margin, 0) / mockOrders.length;
-  const totalOrders = mockOrders.length;
-  const averageTicket = totalRevenue / totalOrders;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Dados para gráficos
-  const revenueData = [
-    { date: '2024-01-15', revenue: 1500, profit: 450 },
-    { date: '2024-01-16', revenue: 2300, profit: 690 },
-    { date: '2024-01-17', revenue: 1800, profit: 540 },
-    { date: '2024-01-18', revenue: 2100, profit: 630 },
-    { date: '2024-01-19', revenue: 1900, profit: 570 },
-  ];
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-destructive">Erro: {error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  const marketplaceData = [
-    { marketplace: 'Mercado Livre', revenue: 3300, profit: 990 },
-    { marketplace: 'Shopee', revenue: 2300, profit: 690 },
-    { marketplace: 'TikTok Shop', revenue: 1500, profit: 450 },
-  ];
+  if (!data) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-muted-foreground">Nenhum dado disponível</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Dados detalhados por marketplace para os cards
-  const marketplaceStats = [
-    {
-      marketplace: 'Mercado Livre',
-      revenue: 3300,
-      profit: 990,
-      orders: 45,
-      margin: 30.0,
-      trend: { value: 15.2, isPositive: true },
-    },
-    {
-      marketplace: 'Shopee',
-      revenue: 2300,
-      profit: 690,
-      orders: 32,
-      margin: 30.0,
-      trend: { value: 8.5, isPositive: true },
-    },
-    {
-      marketplace: 'TikTok Shop',
-      revenue: 1500,
-      profit: 450,
-      orders: 18,
-      margin: 30.0,
-      trend: { value: -3.2, isPositive: false },
-    },
-    {
-      marketplace: 'Shein',
-      revenue: 1200,
-      profit: 360,
-      orders: 15,
-      margin: 30.0,
-      trend: { value: 12.1, isPositive: true },
-    },
-  ];
-
-  const marginData = [
-    { store: 'Loja A', margin: 30.5 },
-    { store: 'Loja B', margin: 28.2 },
-    { store: 'Loja C', margin: 32.1 },
-  ];
+  const {
+    kpis,
+    marketplaceStats,
+    revenueData,
+    marketplaceData,
+    marginData,
+    orders,
+  } = data;
 
   if (isLoading) {
     return (
@@ -151,45 +162,45 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         <KpiCard
           title="Faturamento Total"
-          value={formatCurrency(totalRevenue)}
+          value={formatCurrency(kpis.totalRevenue)}
           icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
           description="Período selecionado"
-          trend={{ value: 20.1, isPositive: true }}
+          trend={{ value: 0, isPositive: true }}
         />
         <KpiCard
           title="Receita Líquida"
-          value={formatCurrency(netRevenue)}
+          value={formatCurrency(kpis.netRevenue)}
           icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
           description="Após descontos"
-          trend={{ value: 15.2, isPositive: true }}
+          trend={{ value: 0, isPositive: true }}
         />
         <KpiCard
           title="Lucro Total"
-          value={formatCurrency(totalProfit)}
+          value={formatCurrency(kpis.totalProfit)}
           icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
           description="Lucro líquido"
-          trend={{ value: 18.5, isPositive: true }}
+          trend={{ value: 0, isPositive: kpis.totalProfit >= 0 }}
         />
         <KpiCard
           title="Margem Média"
-          value={`${averageMargin.toFixed(1)}%`}
+          value={`${kpis.averageMargin.toFixed(1)}%`}
           icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
           description="Margem de lucro"
-          trend={{ value: 2.3, isPositive: true }}
+          trend={{ value: 0, isPositive: kpis.averageMargin >= 0 }}
         />
         <KpiCard
           title="Total de Pedidos"
-          value={totalOrders}
+          value={kpis.totalOrders}
           icon={<Package className="h-4 w-4 text-muted-foreground" />}
           description="No período"
-          trend={{ value: 5.5, isPositive: true }}
+          trend={{ value: 0, isPositive: true }}
         />
         <KpiCard
           title="Ticket Médio"
-          value={formatCurrency(averageTicket)}
+          value={formatCurrency(kpis.averageTicket)}
           icon={<ShoppingCart className="h-4 w-4 text-muted-foreground" />}
           description="Por pedido"
-          trend={{ value: -2.1, isPositive: false }}
+          trend={{ value: 0, isPositive: true }}
         />
       </div>
 
@@ -205,6 +216,8 @@ export default function DashboardPage() {
               profit={stats.profit}
               orders={stats.orders}
               margin={stats.margin}
+              totalFees={stats.totalFees}
+              totalRevenue={kpis.totalRevenue}
               trend={stats.trend}
             />
           ))}
@@ -220,7 +233,7 @@ export default function DashboardPage() {
       <MarginChart data={marginData} />
 
       {/* Tabela de Pedidos */}
-      <OrdersTable orders={mockOrders} />
+      <OrdersTable orders={orders} />
     </main>
   );
 }

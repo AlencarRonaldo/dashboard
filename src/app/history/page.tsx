@@ -24,10 +24,13 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImport, setSelectedImport] = useState<ImportHistory | null>(null);
 
-  const filteredHistory = history.filter(item =>
-    item.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.marketplace.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredHistory = history.filter(item => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    const fileNameMatch = item.fileName?.toLowerCase().includes(searchLower) || false;
+    const marketplaceMatch = item.marketplace?.toLowerCase().includes(searchLower) || false;
+    return fileNameMatch || marketplaceMatch;
+  });
 
   const getStatusIcon = (status: ImportHistory['status']) => {
     switch (status) {
@@ -62,7 +65,7 @@ export default function HistoryPage() {
       case 'failed':
         return 'text-red-600 bg-red-50 dark:bg-red-900/20';
       case 'processing':
-        return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20';
+        return 'text-green-600 bg-green-50 dark:bg-green-900/20';
       case 'pending':
         return 'text-blue-600 bg-blue-50 dark:bg-blue-900/20';
     }

@@ -10,6 +10,8 @@ interface MarketplaceCardProps {
   profit: number;
   orders: number;
   margin: number;
+  totalFees?: number; // Total de taxas (fees + commissions)
+  totalRevenue?: number; // Faturamento total de todas as vendas
   trend?: {
     value: number;
     isPositive: boolean;
@@ -46,6 +48,8 @@ export function MarketplaceCard({
   profit,
   orders,
   margin,
+  totalFees = 0,
+  totalRevenue,
   trend,
 }: MarketplaceCardProps) {
   const colors = marketplaceColors[marketplace] || {
@@ -61,9 +65,18 @@ export function MarketplaceCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <div className="text-2xl font-bold text-foreground">{formatCurrency(revenue)}</div>
+          <div className="text-2xl font-bold text-foreground">
+            {formatCurrency(totalRevenue !== undefined ? totalRevenue : revenue)}
+          </div>
           <p className="text-xs text-muted-foreground mt-1">Faturamento Total</p>
         </div>
+        
+        {totalRevenue !== undefined && (
+          <div className="text-sm text-muted-foreground">
+            <span className="text-xs">Deste marketplace: </span>
+            <span className="font-medium">{formatCurrency(revenue)}</span>
+          </div>
+        )}
         
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -75,6 +88,15 @@ export function MarketplaceCard({
             <p className="text-xs text-muted-foreground">Pedidos</p>
           </div>
         </div>
+        
+        {totalFees > 0 && (
+          <div className="pt-2 border-t border-border">
+            <div className="text-sm font-medium text-muted-foreground">
+              <span className="text-xs">Total de Taxas: </span>
+              <span className="text-destructive font-semibold">{formatCurrency(totalFees)}</span>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <div>

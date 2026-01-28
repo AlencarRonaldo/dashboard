@@ -69,8 +69,20 @@ export async function GET(
       }
     }
 
+    // Transforma snake_case para camelCase para corresponder à interface do frontend
+    const transformedImport = {
+      id: importRecord.id,
+      date: importRecord.created_at,
+      fileName: importRecord.file_name || '',
+      status: importRecord.status,
+      recordsCount: ordersCount || 0,
+      errorDetails: importRecord.error_details || null,
+      finishedAt: importRecord.finished_at || null,
+      marketplace: undefined, // Não existe na tabela imports
+    }
+
     const finalResponse = NextResponse.json({
-      import: importRecord,
+      import: transformedImport,
       statistics: {
         ordersCount: ordersCount || 0,
         totalRevenue: totals.totalRevenue,
