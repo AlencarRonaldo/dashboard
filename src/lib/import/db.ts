@@ -49,37 +49,40 @@ export async function saveDataToDatabase(
     const normalizedMarketplaceName = marketplaceNameMap[marketplaceName.toLowerCase()] || marketplaceName.toLowerCase();
     
     // Busca ou cria uma loja padrão para o marketplace
-    const { data: marketplace, error: marketplaceError } = await supabase
+    const { data: marketplaceData, error: marketplaceError } = await (supabase as any)
       .from('marketplaces')
       .select('id, name, display_name')
       .eq('name', normalizedMarketplaceName)
       .maybeSingle();
-    
+
     if (marketplaceError) {
       console.error('Erro ao buscar marketplace:', marketplaceError);
       throw new Error(`Erro ao buscar marketplace: ${marketplaceError.message}`);
     }
 
+    // Type assertion para marketplace
+    const marketplace = marketplaceData as { id: string; name: string; display_name: string } | null;
+
     if (!marketplace) {
       console.error(`[saveDataToDatabase] Marketplace ${normalizedMarketplaceName} não encontrado.`);
       // Tenta buscar todos os marketplaces para debug
-      const { data: allMarketplaces, error: allMpError } = await supabase
+      const { data: allMarketplaces, error: allMpError } = await (supabase as any)
         .from('marketplaces')
         .select('id, name, display_name');
-      
+
       if (allMpError) {
         console.error('[saveDataToDatabase] Erro ao buscar todos os marketplaces:', allMpError);
       } else {
         console.log('[saveDataToDatabase] Marketplaces disponíveis no banco:', allMarketplaces);
       }
-      
+
       throw new Error(`Marketplace "${marketplaceName}" não encontrado. Verifique se o marketplace está cadastrado no banco de dados.`);
     }
-    
+
     console.log(`[saveDataToDatabase] Marketplace encontrado: ${marketplace.name} (ID: ${marketplace.id})`);
     
     // Verifica se já existe uma loja para este marketplace e usuário
-    const { data: existingStore, error: storeCheckError } = await supabase
+    const { data: existingStoreData, error: storeCheckError } = await (supabase as any)
       .from('stores')
       .select('id')
       .eq('user_id', userId)
@@ -91,13 +94,15 @@ export async function saveDataToDatabase(
       console.error('Erro ao verificar loja existente:', storeCheckError);
     }
 
+    const existingStore = existingStoreData as { id: string } | null;
+
     if (existingStore) {
       finalStoreId = existingStore.id;
       console.log(`Usando loja existente: ${finalStoreId}`);
     } else {
       // Cria uma nova loja
       const storeName = `Loja ${marketplace.display_name || marketplaceName}`;
-      const { data: newStore, error: createError } = await supabase
+      const { data: newStoreData, error: createError } = await (supabase as any)
         .from('stores')
         .insert({
           user_id: userId,
@@ -111,17 +116,19 @@ export async function saveDataToDatabase(
         console.error('Erro ao criar loja:', createError);
         throw new Error(`Não foi possível criar loja para o marketplace ${marketplaceName}: ${createError.message}`);
       }
-      
+
+      const newStore = newStoreData as { id: string } | null;
+
       if (!newStore) {
         throw new Error(`Não foi possível criar loja para o marketplace ${marketplaceName}: Loja não foi criada`);
       }
-      
+
       finalStoreId = newStore.id;
       console.log(`Loja criada com sucesso: ${finalStoreId} (${storeName})`);
     }
   } else {
     // Valida se a loja existe e pertence ao usuário
-    const { data: store, error: storeError } = await supabase
+    const { data: store, error: storeError } = await (supabase as any)
       .from('stores')
       .select('id')
       .eq('id', storeId)
@@ -141,7 +148,7 @@ export async function saveDataToDatabase(
 
   // 1. Criar um registro de importação
   console.log('[saveDataToDatabase] Criando registro de importação...');
-  const { data: importRecord, error: importError } = await supabase
+  const { data: importRecord, error: importError } = await (supabase as any)
     .from('imports')
     .insert({
       user_id: userId,
@@ -191,13 +198,13 @@ export async function saveDataToDatabase(
     );
 
     // 3. Busca TODOS os pedidos existentes de uma vez (otimização)
-    const { data: existingOrdersData } = await supabase
+    const { data: existingOrdersData } = await (supabase as any)
       .from('orders')
       .select('platform_order_id, order_date')
       .eq('store_id', finalStoreId);
 
     const existingOrdersSet = new Set(
-      (existingOrdersData || []).map((o) => `${o.platform_order_id}_${finalStoreId}`)
+      (existingOrdersData || []).map((o: any) => `${o.platform_order_id}_${finalStoreId}`)
     );
 
     console.log(
@@ -246,12 +253,15 @@ export async function saveDataToDatabase(
         if (insertedCount % 10 === 0) {
           console.log(`[saveDataToDatabase] Processando pedido ${index + 1}/${uniqueOrders.length}: ${item.platform_order_id}...`);
         }
-        const { data: order, error: orderError } = await supabase
+        const { data: order, error: orderError } = await (supabase as any)
           .from('orders')
           .insert({
             store_id: finalStoreId,
             import_id: importRecord.id,
             platform_order_id: item.platform_order_id,
+            external_order_id: item.external_order_id || null,
+            platform_name: item.platform_name || null,
+            store_name: item.store_name || null,
             order_date: item.order_date.toISOString(),
             settlement_date: item.settlement_date?.toISOString(),
           })
@@ -302,7 +312,7 @@ export async function saveDataToDatabase(
           sku: item.sku,
           quantity: item.quantity,
         };
-        const { error: itemError } = await supabase.from('order_items').insert(orderItem);
+        const { error: itemError } = await (supabase as any).from('order_items').insert(orderItem);
         if (itemError) {
           console.error(`[saveDataToDatabase] Erro ao inserir item do pedido ${item.platform_order_id}:`, {
             code: itemError.code,
@@ -334,39 +344,18 @@ export async function saveDataToDatabase(
         const productCost = typeof item.product_cost === 'number' && !isNaN(item.product_cost) ? item.product_cost : 0;
         // Comissões podem vir como negativas (descontos), então usa valor absoluto
         const commissions = typeof item.commissions === 'number' && !isNaN(item.commissions) ? Math.abs(item.commissions) : 0;
-        const fees = typeof item.fees === 'number' && !isNaN(item.fees) ? item.fees : 0;
+        const totalFees = typeof item.total_fees === 'number' && !isNaN(item.total_fees) ? item.total_fees : 0;
         const refunds = typeof item.refunds === 'number' && !isNaN(item.refunds) && item.refunds > 0 ? item.refunds : 0;
         
-        // Calcula o lucro correto baseado nos custos
-        // Lucro = Receita - Custo do Produto - Comissões (absoluto) - Taxas - Reembolsos
-        const calculatedProfit = revenue > 0 
-          ? revenue - productCost - commissions - fees - refunds 
-          : 0;
-        
-        // Calcula profit - valida se o valor do item está consistente
+        // Usa o lucro da planilha diretamente (prioridade máxima)
+        // Só calcula se não existir na planilha
         let profit = null;
         if (typeof item.profit === 'number' && !isNaN(item.profit)) {
-          // Valida: lucro não pode ser maior que receita
-          if (item.profit > revenue && revenue > 0) {
-            console.warn(`[saveDataToDatabase] ⚠️ Lucro inconsistente para pedido ${item.platform_order_id}: lucro=${item.profit}, receita=${revenue}. Recalculando...`);
-            profit = calculatedProfit;
-          } else if (revenue > 0 && Math.abs(item.profit - calculatedProfit) > revenue * 0.05) {
-            // Se a diferença for maior que 5% da receita, recalcula
-            console.warn(`[saveDataToDatabase] ⚠️ Lucro muito diferente do calculado para pedido ${item.platform_order_id}: lucro=${item.profit}, calculado=${calculatedProfit}. Usando calculado.`);
-            profit = calculatedProfit;
-          } else {
-            // Lucro parece válido
-            profit = item.profit;
-          }
+          // Usa o valor da planilha diretamente
+          profit = item.profit;
         } else if (revenue > 0) {
-          // Não tem lucro no item, calcula
-          profit = calculatedProfit;
-        }
-        
-        // Garantia final: lucro nunca pode ser maior que receita
-        if (profit !== null && profit > revenue && revenue > 0) {
-          console.warn(`[saveDataToDatabase] ⚠️ Correção final: lucro (${profit}) > receita (${revenue}) para pedido ${item.platform_order_id}. Ajustando...`);
-          profit = calculatedProfit;
+          // Só calcula se não tiver valor na planilha
+          profit = revenue - productCost - commissions - totalFees - refunds;
         }
         
         // Calcula profit_margin se não estiver presente
@@ -392,9 +381,15 @@ export async function saveDataToDatabase(
           order_value: orderValue > 0 ? orderValue : revenue,
           revenue: revenue > 0 ? revenue : (orderValue > 0 ? orderValue : 0),
           product_sales: typeof item.product_sales === 'number' && !isNaN(item.product_sales) ? item.product_sales : null,
+          // Taxas detalhadas (novos campos)
+          shipping_fee_buyer: typeof item.shipping_fee_buyer === 'number' && !isNaN(item.shipping_fee_buyer) ? item.shipping_fee_buyer : null,
+          platform_discount: typeof item.platform_discount === 'number' && !isNaN(item.platform_discount) ? item.platform_discount : null,
           // Salva comissões como valor absoluto (sempre positivo no banco)
           commissions: typeof item.commissions === 'number' && !isNaN(item.commissions) ? Math.abs(item.commissions) : null,
-          fees: typeof item.fees === 'number' && !isNaN(item.fees) ? item.fees : null,
+          transaction_fee: typeof item.transaction_fee === 'number' && !isNaN(item.transaction_fee) ? Math.abs(item.transaction_fee) : null,
+          shipping_fee: typeof item.shipping_fee === 'number' && !isNaN(item.shipping_fee) ? Math.abs(item.shipping_fee) : null,
+          other_platform_fees: typeof item.other_platform_fees === 'number' && !isNaN(item.other_platform_fees) ? Math.abs(item.other_platform_fees) : null,
+          // total_fees é GENERATED ALWAYS - não inserir diretamente
           refunds: typeof item.refunds === 'number' && !isNaN(item.refunds) && item.refunds > 0 ? item.refunds : null,
           product_cost: typeof item.product_cost === 'number' && !isNaN(item.product_cost) ? item.product_cost : null,
           profit: profit,
@@ -407,14 +402,15 @@ export async function saveDataToDatabase(
             revenue: financials.revenue,
             product_cost: financials.product_cost,
             commissions: financials.commissions,
-            fees: financials.fees,
+            transaction_fee: financials.transaction_fee,
+            shipping_fee: financials.shipping_fee,
             refunds: financials.refunds,
             profit: financials.profit,
             profit_margin: financials.profit_margin,
             order_value: financials.order_value
           });
         }
-        const { error: financialsError } = await supabase.from('order_financials').insert(financials);
+        const { error: financialsError } = await (supabase as any).from('order_financials').insert(financials);
         if (financialsError) {
           console.error(`[saveDataToDatabase] Erro ao inserir dados financeiros do pedido ${item.platform_order_id}:`, {
             code: financialsError.code,
@@ -443,9 +439,9 @@ export async function saveDataToDatabase(
     const hasErrors = errors.length > 0;
     const status = hasErrors && insertedCount === 0 ? 'failed' : 'success';
     
-    await supabase
+    await (supabase as any)
       .from('imports')
-      .update({ 
+      .update({
         status,
         finished_at: new Date().toISOString(),
         error_details: hasErrors ? `Inseridos: ${insertedCount}, Ignorados: ${skippedCount}, Erros: ${errors.length}. ${errors.slice(0, 3).join('; ')}` : null
@@ -484,7 +480,7 @@ export async function saveDataToDatabase(
     
     // Tenta atualizar o status mesmo em caso de erro
     try {
-      await supabase
+      await (supabase as any)
         .from('imports')
         .update({
           status: 'failed',

@@ -1,4 +1,4 @@
-import { MarketplaceName, NormalizedOrder } from '../types';
+import { MarketplaceName, NormalizedOrder, normalizeHeader, findColumnIndex, COLUMN_SYNONYMS } from '../types';
 import meliParser from './meli';
 import shopeeParser from './shopee';
 import sheinParser from './shein';
@@ -156,59 +156,58 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
     return isNaN(n) ? 0 : n;
   };
 
-  // Campos financeiros opcionais
-  const idxOrderValue = headerLower.findIndex((h) => h.includes('valor do pedido'));
-  const idxRevenue = headerLower.findIndex(
-    (h) => h === 'receita' || h.includes('valor de liquidação') || h.includes('valor de liquidacao')
-  );
-  const idxProductSales = headerLower.findIndex((h) => h.includes('vendas de produtos'));
-  const idxCommissions = headerLower.findIndex(
-    (h) => h.startsWith('comissão') || h.startsWith('comissao') || h === 'comissão' || h === 'comissao'
-  );
-  
-  // Mapear todas as taxas e custos do UpSeller
-  const idxProductCost = headerLower.findIndex((h) => 
-    h.includes('custo do produto') || h.includes('custo')
-  );
-  // Detecção mais flexível de taxas - tenta múltiplas variações
-  const idxTransactionFee = headerLower.findIndex((h) => 
-    h.includes('taxa de transação') || h.includes('taxa de transacao') || 
-    h.includes('transaction fee') || h.includes('taxa transação')
-  );
-  const idxServiceFee = headerLower.findIndex((h) => 
+  // Campos financeiros opcionais - usando detecção inteligente com sinônimos
+  const idxOrderValue = findColumnIndex(headerLower, 'orderValue');
+  const idxRevenue = findColumnIndex(headerLower, 'revenue');
+  const idxProductSales = findColumnIndex(headerLower, 'productSales');
+  const idxCommissions = findColumnIndex(headerLower, 'commissions');
+
+  // Mapear todas as taxas e custos usando sinônimos
+  const idxProductCost = findColumnIndex(headerLower, 'productCost');
+  const idxTransactionFee = findColumnIndex(headerLower, 'transactionFee');
+  const idxShippingFee = findColumnIndex(headerLower, 'shippingFee');
+  const idxOtherPlatformFee = findColumnIndex(headerLower, 'otherPlatformFees');
+  const idxRefunds = findColumnIndex(headerLower, 'refunds');
+
+  // Novos campos detalhados
+  const idxShippingFeeBuyer = findColumnIndex(headerLower, 'shippingFeeBuyer');
+  const idxPlatformDiscount = findColumnIndex(headerLower, 'platformDiscount');
+  const idxExternalOrderId = findColumnIndex(headerLower, 'externalOrderId');
+  const idxSku = findColumnIndex(headerLower, 'sku');
+  const idxQuantity = findColumnIndex(headerLower, 'quantity');
+  const idxStoreName = findColumnIndex(headerLower, 'storeName');
+
+  // Fallback para taxa de frete se não encontrou com sinônimos
+  const finalIdxShippingFee = idxShippingFee !== -1
+    ? idxShippingFee
+    : headerLower.findIndex((h) =>
+        (h === 'taxa do frete' || h === 'taxa de frete') &&
+        !h.includes('paga pelo comprador')
+      );
+
+  // Taxa de serviço (legado)
+  const idxServiceFee = headerLower.findIndex((h) =>
     h.includes('taxa de serviço') || h.includes('taxa de servico') ||
     h.includes('service fee') || h.includes('taxa serviço')
-  );
-  // Prioriza "Taxa do Frete" exata, depois "Taxa de Frete", depois qualquer coisa com "frete" (exceto "paga pelo comprador")
-  const idxFreightFee = headerLower.findIndex((h) => 
-    h === 'taxa do frete' || h === 'taxa de frete'
-  );
-  // Se não encontrou exato, procura qualquer coisa com frete (exceto "paga pelo comprador")
-  const idxFreightFeeFallback = idxFreightFee === -1 
-    ? headerLower.findIndex((h) => 
-        h.includes('frete') && !h.includes('paga pelo comprador') && !h.includes('taxa de frete paga')
-      )
-    : -1;
-  const finalIdxFreightFee = idxFreightFee !== -1 ? idxFreightFee : idxFreightFeeFallback;
-  const idxOtherPlatformFee = headerLower.findIndex((h) => 
-    h.includes('outra taxa da plataforma') || h.includes('outra taxa') ||
-    h.includes('other platform fee') || h.includes('outras taxas')
-  );
-  const idxRefunds = headerLower.findIndex((h) => 
-    h.includes('reembolso') || h.includes('reemb')
   );
   
   // Log dos índices encontrados para debug
   console.log('[Aggregator] ========== MAPEAMENTO DE COLUNAS ==========');
   console.log('[Aggregator] Cabeçalho completo:', header);
-  console.log('[Aggregator] Índices de colunas financeiras encontrados:', {
+  console.log('[Aggregator] Índices de colunas encontrados:', {
+    orderValue: idxOrderValue !== -1 ? `${idxOrderValue}: ${header[idxOrderValue]}` : 'não encontrado',
+    revenue: idxRevenue !== -1 ? `${idxRevenue}: ${header[idxRevenue]}` : 'não encontrado',
     productCost: idxProductCost !== -1 ? `${idxProductCost}: ${header[idxProductCost]}` : 'não encontrado',
-    transactionFee: idxTransactionFee !== -1 ? `${idxTransactionFee}: ${header[idxTransactionFee]}` : 'não encontrado',
-    serviceFee: idxServiceFee !== -1 ? `${idxServiceFee}: ${header[idxServiceFee]}` : 'não encontrado',
-    freightFee: finalIdxFreightFee !== -1 ? `${finalIdxFreightFee}: ${header[finalIdxFreightFee]}` : 'não encontrado',
-    otherPlatformFee: idxOtherPlatformFee !== -1 ? `${idxOtherPlatformFee}: ${header[idxOtherPlatformFee]}` : 'não encontrado',
-    refunds: idxRefunds !== -1 ? `${idxRefunds}: ${header[idxRefunds]}` : 'não encontrado',
     commissions: idxCommissions !== -1 ? `${idxCommissions}: ${header[idxCommissions]}` : 'não encontrado',
+    transactionFee: idxTransactionFee !== -1 ? `${idxTransactionFee}: ${header[idxTransactionFee]}` : 'não encontrado',
+    shippingFee: finalIdxShippingFee !== -1 ? `${finalIdxShippingFee}: ${header[finalIdxShippingFee]}` : 'não encontrado',
+    otherPlatformFee: idxOtherPlatformFee !== -1 ? `${idxOtherPlatformFee}: ${header[idxOtherPlatformFee]}` : 'não encontrado',
+    shippingFeeBuyer: idxShippingFeeBuyer !== -1 ? `${idxShippingFeeBuyer}: ${header[idxShippingFeeBuyer]}` : 'não encontrado',
+    platformDiscount: idxPlatformDiscount !== -1 ? `${idxPlatformDiscount}: ${header[idxPlatformDiscount]}` : 'não encontrado',
+    refunds: idxRefunds !== -1 ? `${idxRefunds}: ${header[idxRefunds]}` : 'não encontrado',
+    sku: idxSku !== -1 ? `${idxSku}: ${header[idxSku]}` : 'não encontrado',
+    storeName: idxStoreName !== -1 ? `${idxStoreName}: ${header[idxStoreName]}` : 'não encontrado',
+    externalOrderId: idxExternalOrderId !== -1 ? `${idxExternalOrderId}: ${header[idxExternalOrderId]}` : 'não encontrado',
   });
   console.log('[Aggregator] ===========================================');
   
@@ -243,17 +242,26 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
       idxProductSales !== -1 ? parseMoney(row[idxProductSales]) : undefined;
     const commissions =
       idxCommissions !== -1 ? parseMoney(row[idxCommissions]) : undefined;
-    
-    // Lê todos os custos e taxas
+
+    // Lê todos os custos e taxas detalhadas
     const productCost = idxProductCost !== -1 ? parseMoney(row[idxProductCost]) : undefined;
     const transactionFee = idxTransactionFee !== -1 ? parseMoney(row[idxTransactionFee]) : undefined;
     const serviceFee = idxServiceFee !== -1 ? parseMoney(row[idxServiceFee]) : undefined;
-    const freightFee = finalIdxFreightFee !== -1 ? parseMoney(row[finalIdxFreightFee]) : undefined;
+    const shippingFee = finalIdxShippingFee !== -1 ? parseMoney(row[finalIdxShippingFee]) : undefined;
     const otherPlatformFee = idxOtherPlatformFee !== -1 ? parseMoney(row[idxOtherPlatformFee]) : undefined;
     const refunds = idxRefunds !== -1 ? parseMoney(row[idxRefunds]) : undefined;
-    
+
+    // Novos campos detalhados
+    const shippingFeeBuyer = idxShippingFeeBuyer !== -1 ? parseMoney(row[idxShippingFeeBuyer]) : undefined;
+    const platformDiscount = idxPlatformDiscount !== -1 ? parseMoney(row[idxPlatformDiscount]) : undefined;
+    const externalOrderId = idxExternalOrderId !== -1 ? row[idxExternalOrderId] : undefined;
+    const sku = idxSku !== -1 ? String(row[idxSku] || 'N/A').trim() : 'N/A';
+    const quantity = idxQuantity !== -1 ? parseInt(String(row[idxQuantity])) || 1 : 1;
+    const storeName = idxStoreName !== -1 ? String(row[idxStoreName] || '').trim() : undefined;
+    const platformNameValue = finalIdxPlatform !== -1 ? String(row[finalIdxPlatform] || '').trim() : undefined;
+
     // Soma todas as taxas (exceto comissão que já está separada)
-    const totalFees = (transactionFee ?? 0) + (serviceFee ?? 0) + (freightFee ?? 0) + (otherPlatformFee ?? 0);
+    const totalFees = (transactionFee ?? 0) + (serviceFee ?? 0) + (shippingFee ?? 0) + (otherPlatformFee ?? 0);
     
     // Revenue base: receita ou vendas de produtos ou valor do pedido
     const baseRevenue = revenue ?? productSales ?? orderValue;
@@ -266,7 +274,7 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
         commissions,
         transactionFee,
         serviceFee,
-        freightFee,
+        shippingFee,
         otherPlatformFee,
         totalFees,
         refunds,
@@ -280,35 +288,29 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
 
     if (baseRevenue != null && baseRevenue > 0) {
       const costValue = productCost ?? 0;
-      // Comissões podem vir como negativas (descontos), então usa valor absoluto
-      const commissionsValue = commissions != null ? Math.abs(commissions) : 0;
       const refundsValue = refunds ?? 0;
-      
-      // Calcula o lucro correto baseado nos custos
-      // Lucro = Receita - Custo do Produto - Comissões (absoluto) - Taxas - Reembolsos
-      const calculatedProfit = baseRevenue - costValue - commissionsValue - totalFees - refundsValue;
-      
-      // Se existe uma coluna "Lucro" na planilha, valida se está consistente
+
+      // Lucro = Receita líquida - Custo do Produto - Reembolsos
+      // IMPORTANTE: NÃO subtrair comissões/taxas aqui pois baseRevenue (= "Receita de venda")
+      // já vem com comissões e taxas descontadas pelo marketplace.
+      const calculatedProfit = baseRevenue - costValue - refundsValue;
+
+      // Se existe uma coluna "Lucro" na planilha, usa diretamente
       if (idxProfit !== -1) {
         const profitFromSheet = parseMoney(row[idxProfit]);
-        // Valida: lucro não pode ser maior que receita, e não pode ser muito diferente do calculado
-        // Se o lucro da planilha for maior que a receita ou muito diferente do calculado, usa o calculado
-        if (profitFromSheet !== 0 && profitFromSheet <= baseRevenue && Math.abs(profitFromSheet - calculatedProfit) < baseRevenue * 0.1) {
-          // Lucro da planilha parece válido (dentro de 10% de diferença)
+        if (profitFromSheet !== 0) {
           profit = profitFromSheet;
         } else {
-          // Lucro da planilha está inconsistente, usa o calculado
-          console.warn(`[Aggregator] Lucro da planilha inconsistente (${profitFromSheet}) para pedido ${rawOrderId}. Usando cálculo: ${calculatedProfit}`);
           profit = calculatedProfit;
         }
       } else {
-        // Não tem coluna de lucro, usa o calculado
         profit = calculatedProfit;
       }
-      
-      // Calcula a margem
-      if (baseRevenue > 0) {
-        profitMargin = (profit / baseRevenue) * 100;
+
+      // Calcula a margem sobre o valor do pedido (faturamento bruto)
+      const base = orderValue > 0 ? orderValue : baseRevenue;
+      if (base > 0) {
+        profitMargin = (profit / base) * 100;
       }
     }
 
@@ -320,31 +322,33 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
     
     normalized.push({
       platform_order_id: String(rawOrderId),
+      external_order_id: externalOrderId ? String(externalOrderId).trim() : undefined,
+      platform_name: platformNameValue || 'Mercado Livre',
+      store_name: storeName,
       order_date: orderDate,
       settlement_date: undefined,
-      sku: 'N/A', // agregador não traz SKU detalhado neste layout
-      quantity: 1,
+      sku: sku,
+      quantity: quantity,
       order_value: orderValue || baseRevenue || 0,
       revenue: baseRevenue,
       product_sales: productSales,
+      // Taxas detalhadas
+      shipping_fee_buyer: shippingFeeBuyer && shippingFeeBuyer > 0 ? shippingFeeBuyer : undefined,
+      platform_discount: platformDiscount && platformDiscount > 0 ? platformDiscount : undefined,
       // Salva comissões como valor absoluto (sempre positivo no banco)
       commissions: commissions != null ? Math.abs(commissions) : undefined,
-      fees: totalFees > 0 ? totalFees : undefined,
-      refunds: refunds && refunds > 0 ? refunds : undefined,
+      transaction_fee: transactionFee != null ? Math.abs(transactionFee) : undefined,
+      shipping_fee: shippingFee != null ? Math.abs(shippingFee) : undefined,
+      other_platform_fees: otherPlatformFee != null ? Math.abs(otherPlatformFee) : undefined,
+      total_fees: totalFees,
       product_cost: productCost,
-      profit,
+      profit: profit,
       profit_margin: profitMargin,
     });
   }
 
-  if (normalized.length === 0) {
-    console.warn('[Aggregator] Nenhuma linha válida encontrada após normalização.');
-    return null;
-  }
-
-  // Resumo das taxas encontradas
-  const ordersWithFees = normalized.filter(o => (o.fees ?? 0) > 0 || (o.commissions ?? 0) > 0).length;
-  const totalFeesSum = normalized.reduce((sum, o) => sum + (o.fees ?? 0), 0);
+  const ordersWithFees = normalized.filter(o => (o.total_fees ?? 0) > 0 || (o.commissions ?? 0) > 0).length;
+  const totalFeesSum = normalized.reduce((sum, o) => sum + (o.total_fees ?? 0), 0);
   const totalCommissionsSum = normalized.reduce((sum, o) => sum + (o.commissions ?? 0), 0);
   
   console.log(
@@ -426,3 +430,4 @@ export function detectAndParse(rows: any[][]): ParserResult | null {
   console.error('[detectAndParse] Total de linhas:', rows.length);
   return null;
 }
+

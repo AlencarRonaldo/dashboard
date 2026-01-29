@@ -66,17 +66,10 @@ export function MarketplaceCard({
       <CardContent className="space-y-4">
         <div>
           <div className="text-2xl font-bold text-foreground">
-            {formatCurrency(totalRevenue !== undefined ? totalRevenue : revenue)}
+            {formatCurrency(revenue)}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">Faturamento Total</p>
+          <p className="text-xs text-muted-foreground mt-1">Faturamento</p>
         </div>
-        
-        {totalRevenue !== undefined && (
-          <div className="text-sm text-muted-foreground">
-            <span className="text-xs">Deste marketplace: </span>
-            <span className="font-medium">{formatCurrency(revenue)}</span>
-          </div>
-        )}
         
         <div className="grid grid-cols-2 gap-4">
           <div>
