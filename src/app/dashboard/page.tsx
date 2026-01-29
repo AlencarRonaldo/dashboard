@@ -163,44 +163,50 @@ export default function DashboardPage() {
         <KpiCard
           title="Faturamento Total"
           value={formatCurrency(kpis.totalRevenue)}
-          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          icon={<DollarSign className="h-4 w-4" />}
           description="Período selecionado"
           trend={{ value: 0, isPositive: true }}
+          accent="blue"
         />
         <KpiCard
           title="Receita Líquida"
           value={formatCurrency(kpis.netRevenue)}
-          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          icon={<DollarSign className="h-4 w-4" />}
           description="Após descontos"
           trend={{ value: 0, isPositive: true }}
+          accent="purple"
         />
         <KpiCard
           title="Lucro Total"
           value={formatCurrency(kpis.totalProfit)}
-          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+          icon={<TrendingUp className="h-4 w-4" />}
           description="Lucro líquido"
           trend={{ value: 0, isPositive: kpis.totalProfit >= 0 }}
+          accent="green"
         />
         <KpiCard
           title="Margem Média"
           value={`${kpis.averageMargin.toFixed(1)}%`}
-          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+          icon={<TrendingUp className="h-4 w-4" />}
           description="Margem de lucro"
           trend={{ value: 0, isPositive: kpis.averageMargin >= 0 }}
+          accent="emerald"
         />
         <KpiCard
           title="Total de Pedidos"
           value={kpis.totalOrders}
-          icon={<Package className="h-4 w-4 text-muted-foreground" />}
+          icon={<Package className="h-4 w-4" />}
           description="No período"
           trend={{ value: 0, isPositive: true }}
+          accent="orange"
         />
         <KpiCard
           title="Ticket Médio"
           value={formatCurrency(kpis.averageTicket)}
-          icon={<ShoppingCart className="h-4 w-4 text-muted-foreground" />}
+          icon={<ShoppingCart className="h-4 w-4" />}
           description="Por pedido"
           trend={{ value: 0, isPositive: true }}
+          accent="pink"
         />
       </div>
 

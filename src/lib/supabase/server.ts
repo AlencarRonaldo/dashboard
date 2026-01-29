@@ -5,9 +5,9 @@ import { cookies } from 'next/headers'
  * Cria um cliente Supabase para uso em Server Components
  * Este arquivo só deve ser importado em Server Components
  */
-export function createServer() {
+export async function createServer() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     return createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

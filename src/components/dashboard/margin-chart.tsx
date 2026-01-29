@@ -36,8 +36,8 @@ export function MarginChart({ data }: MarginChartProps) {
               tickFormatter={(value) => `${value}%`}
             />
             <YAxis dataKey="store" type="category" width={100} />
-            <Tooltip 
-              formatter={(value: number) => `${value.toFixed(2)}%`}
+            <Tooltip
+              formatter={(value) => `${(value as number)?.toFixed(2) ?? 0}%`}
             />
             <Bar dataKey="margin" fill="#8B5CF6" name="Margem (%)" radius={[0, 4, 4, 0]} />
           </BarChart>

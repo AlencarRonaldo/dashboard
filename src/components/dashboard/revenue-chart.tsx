@@ -46,12 +46,12 @@ export function RevenueChart({ data, period = 'day' }: RevenueChartProps) {
             <YAxis 
               tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
             />
-            <Tooltip 
-              formatter={(value: number) => [
+            <Tooltip
+              formatter={(value) => [
                 new Intl.NumberFormat('pt-BR', {
                   style: 'currency',
                   currency: 'BRL',
-                }).format(value),
+                }).format(value as number ?? 0),
                 ''
               ]}
             />

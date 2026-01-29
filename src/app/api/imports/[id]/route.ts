@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { supabase, response } = createServerFromRequest(request)
   const {
@@ -18,7 +18,8 @@ export async function GET(
   }
 
   try {
-    const importId = params.id
+    const { id } = await params
+    const importId = id
 
     // Busca os detalhes da importação
     const { data: importRecord, error: importError } = await supabase

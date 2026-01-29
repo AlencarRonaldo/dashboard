@@ -37,7 +37,7 @@ export async function processImport(
 
     // 2. Carrega o workbook
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(fileBuffer);
+    await workbook.xlsx.load(fileBuffer as any);
 
     // 3. Valida se há planilhas
     if (workbook.worksheets.length === 0) {
