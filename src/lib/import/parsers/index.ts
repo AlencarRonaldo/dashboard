@@ -23,8 +23,11 @@ interface ParserResult {
  * Regra principal:
  * - Se houver: Plataforma + Nº de Pedido de Plataforma + uma coluna de data
  *   então tentamos importar, mesmo que não siga o layout nativo do marketplace.
+ *
+ * @param rows Linhas da planilha
+ * @param marketplaceHint Marketplace selecionado pelo usuário (usado como fallback)
  */
-function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
+function tryDetectAggregatorFormat(rows: any[][], marketplaceHint?: MarketplaceName | null): ParserResult | null {
   if (!rows || rows.length < 2) return null;
 
   const headerRaw = rows[0] ?? [];
@@ -39,18 +42,32 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
     : -1;
   const finalIdxPlatform = idxPlatform !== -1 ? idxPlatform : idxPlatformFallback;
 
-  const idxOrderId = headerLower.findIndex(
-    (h) =>
-      h.includes('nº de pedido de plataforma') ||
-      h.includes('no de pedido de plataforma') ||
-      (h.includes('pedido') && h.includes('plataforma'))
-  );
+  // Usa findColumnIndex para melhor detecção de colunas com sinônimos
+  let idxOrderId = findColumnIndex(headerLower, 'platformOrderId');
+  // Fallback para busca manual se não encontrar
+  if (idxOrderId === -1) {
+    idxOrderId = headerLower.findIndex(
+      (h) =>
+        h.includes('nº de pedido de plataforma') ||
+        h.includes('no de pedido de plataforma') ||
+        h.includes('n de pedido') ||
+        h.includes('numero do pedido') ||
+        h.includes('id do pedido') ||
+        h.includes('order id') ||
+        (h.includes('pedido') && (h.includes('plataforma') || h.includes('id') || h.includes('numero')))
+    );
+  }
 
-  // Aceita qualquer coluna que pareça data: Ordenado, Liquidação, Data, Date, Time...
-  const dateCandidates = ['ordenado', 'liquidação', 'liquidacao', 'data', 'date', 'time'];
-  const idxOrderDate = headerLower.findIndex((h) =>
-    dateCandidates.some((dc) => h.includes(dc))
-  );
+  // Aceita qualquer coluna que pareça data
+  let idxOrderDate = findColumnIndex(headerLower, 'orderDate');
+  if (idxOrderDate === -1) {
+    const dateCandidates = ['ordenado', 'liquidação', 'liquidacao', 'data', 'date', 'time', 'created', 'criado'];
+    idxOrderDate = headerLower.findIndex((h) =>
+      dateCandidates.some((dc) => h.includes(dc))
+    );
+  }
+
+  console.log('[Aggregator] Detecção de colunas - idxOrderId:', idxOrderId, ', idxOrderDate:', idxOrderDate);
 
   console.log('[Aggregator] Índices detectados:', {
     idxPlatform: finalIdxPlatform,
@@ -59,11 +76,27 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
   });
 
   // Critério mínimo para considerar formato agregador
-  if (finalIdxPlatform === -1 || idxOrderId === -1 || idxOrderDate === -1) {
-    console.warn(
-      '[Aggregator] Critérios mínimos não atendidos (Plataforma + Nº de Pedido de Plataforma + coluna de data).'
-    );
-    return null;
+  // Se o usuário selecionou um marketplace, relaxa os critérios (não precisa da coluna Plataforma)
+  if (marketplaceHint) {
+    // Com hint, só precisa de ID do pedido e data
+    if (idxOrderId === -1 || idxOrderDate === -1) {
+      console.warn(
+        '[Aggregator] Com hint, critérios mínimos não atendidos (Nº de Pedido + coluna de data).'
+      );
+      console.warn('[Aggregator] idxOrderId:', idxOrderId, ', idxOrderDate:', idxOrderDate);
+      console.warn('[Aggregator] Header:', header);
+      return null;
+    }
+    console.log('[Aggregator] ✅ Usando marketplace do hint:', marketplaceHint);
+  } else {
+    // Sem hint, precisa de Plataforma + ID do pedido + data
+    if (finalIdxPlatform === -1 || idxOrderId === -1 || idxOrderDate === -1) {
+      console.warn(
+        '[Aggregator] Critérios mínimos não atendidos (Plataforma + Nº de Pedido de Plataforma + coluna de data).'
+      );
+      console.warn('[Aggregator] idxPlatform:', finalIdxPlatform, ', idxOrderId:', idxOrderId, ', idxOrderDate:', idxOrderDate);
+      return null;
+    }
   }
 
   // CORREÇÃO 2: Inferência melhorada - aceita "Mercado" sozinho e normaliza melhor
@@ -87,24 +120,31 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
   let inferredMarketplace: MarketplaceName | null = null;
   let platformSample = '';
 
-  // Tenta inferir a partir das primeiras linhas com dados
-  for (let i = 1; i < rows.length; i++) {
-    const cell = rows[i]?.[finalIdxPlatform];
-    if (cell == null) continue;
-    const platformStr = String(cell).trim();
-    if (!platformStr) continue;
+  // Se tem coluna Plataforma, tenta inferir a partir das primeiras linhas com dados
+  if (finalIdxPlatform !== -1) {
+    for (let i = 1; i < rows.length; i++) {
+      const cell = rows[i]?.[finalIdxPlatform];
+      if (cell == null) continue;
+      const platformStr = String(cell).trim();
+      if (!platformStr) continue;
 
-    platformSample = platformStr;
-    const mp = inferMarketplaceFromPlatform(platformStr);
-    if (mp) {
-      inferredMarketplace = mp;
-      console.log('[Aggregator] Plataforma detectada:', platformStr, '→ marketplace:', mp);
-      break;
+      platformSample = platformStr;
+      const mp = inferMarketplaceFromPlatform(platformStr);
+      if (mp) {
+        inferredMarketplace = mp;
+        console.log('[Aggregator] Plataforma detectada:', platformStr, '→ marketplace:', mp);
+        break;
+      }
     }
   }
 
-  // CORREÇÃO 3: Fallback inteligente - se não conseguiu inferir, tenta usar o primeiro marketplace válido
-  // como padrão baseado no valor bruto da coluna
+  // Se não conseguiu inferir e tem hint do usuário, usa o hint
+  if (!inferredMarketplace && marketplaceHint) {
+    console.log('[Aggregator] Usando marketplace do hint do usuário:', marketplaceHint);
+    inferredMarketplace = marketplaceHint;
+  }
+
+  // CORREÇÃO 3: Fallback inteligente - se não conseguiu inferir, usa o marketplace selecionado pelo usuário
   if (!inferredMarketplace && platformSample) {
     console.warn(
       `[Aggregator] Não foi possível inferir marketplace exato a partir de "${platformSample}". Tentando fallback...`
@@ -114,6 +154,12 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
     if (fallback) {
       inferredMarketplace = fallback;
       console.log('[Aggregator] Fallback aplicado:', platformSample, '→ marketplace:', fallback);
+    } else if (marketplaceHint) {
+      // Usa o marketplace selecionado pelo usuário como fallback final
+      console.log(
+        `[Aggregator] Usando marketplace selecionado pelo usuário: "${marketplaceHint}"`
+      );
+      inferredMarketplace = marketplaceHint;
     } else {
       // Se ainda assim não conseguir, usa meli como padrão (mais comum em relatórios brasileiros)
       // mas loga um aviso
@@ -123,25 +169,61 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
       inferredMarketplace = 'meli';
     }
   } else if (!inferredMarketplace) {
-    // Se nem conseguiu ler a coluna Plataforma, não pode continuar
-    console.error(
-      '[Aggregator] Não foi possível ler nenhum valor da coluna Plataforma. Abortando.'
-    );
-    return null;
+    // Se nem conseguiu ler a coluna Plataforma, usa o marketplace selecionado pelo usuário
+    if (marketplaceHint) {
+      console.log(
+        `[Aggregator] Coluna Plataforma vazia, usando marketplace selecionado: "${marketplaceHint}"`
+      );
+      inferredMarketplace = marketplaceHint;
+    } else {
+      console.error(
+        '[Aggregator] Não foi possível ler nenhum valor da coluna Plataforma e nenhum marketplace foi selecionado. Abortando.'
+      );
+      return null;
+    }
   }
 
   // Helpers
   const parseDate = (value: any): Date | undefined => {
     if (!value) return undefined;
-    if (value instanceof Date) return value;
+    if (value instanceof Date) return isNaN(value.getTime()) ? undefined : value;
+
+    // Excel serial date (número)
     if (typeof value === 'number') {
       const d = new Date(Math.round((value - 25569) * 86400 * 1000));
       return isNaN(d.getTime()) ? undefined : d;
     }
+
     if (typeof value === 'string') {
-      const d = new Date(value);
+      const trimmed = value.trim();
+
+      // Formato brasileiro DD/MM/YYYY ou DD/MM/YYYY HH:MM:SS
+      const brMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+      if (brMatch) {
+        const [, day, month, year, hour = '0', min = '0', sec = '0'] = brMatch;
+        const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(min), parseInt(sec));
+        return isNaN(d.getTime()) ? undefined : d;
+      }
+
+      // Formato DD-MM-YYYY
+      const brMatch2 = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+      if (brMatch2) {
+        const [, day, month, year] = brMatch2;
+        const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        return isNaN(d.getTime()) ? undefined : d;
+      }
+
+      // Formato ISO YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+        const d = new Date(trimmed);
+        return isNaN(d.getTime()) ? undefined : d;
+      }
+
+      // Tenta parse genérico
+      const d = new Date(trimmed);
       return isNaN(d.getTime()) ? undefined : d;
     }
+
     return undefined;
   };
 
@@ -217,6 +299,11 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
   );
 
   const normalized: NormalizedOrder[] = [];
+  let skippedCount = 0;
+  let processedCount = 0;
+
+  console.log('[Aggregator] Iniciando processamento de', rows.length - 1, 'linhas de dados');
+  console.log('[Aggregator] Primeira linha de dados (row[1]):', rows[1]?.slice(0, 10));
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -224,15 +311,30 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
 
     const rawOrderId = row[idxOrderId];
     const rawOrderDate = row[idxOrderDate];
-    // Nota: não precisamos mais ler idxPlatform aqui, já inferimos o marketplace acima
+
+    // Log detalhado das primeiras 3 linhas para debug
+    if (i <= 3) {
+      console.log(`[Aggregator] Linha ${i}:`, {
+        rawOrderId,
+        rawOrderDate,
+        idxOrderId,
+        idxOrderDate,
+        rowLength: row.length,
+        row: row.slice(0, 10),
+      });
+    }
 
     const orderDate = parseDate(rawOrderDate);
     if (!rawOrderId || !orderDate) {
-      console.warn('[Aggregator] Linha ignorada (falta ID de pedido ou data inválida):', {
-        rowIndex: i + 1,
-        rawOrderId,
-        rawOrderDate,
-      });
+      if (skippedCount < 5) {
+        console.warn('[Aggregator] Linha ignorada (falta ID de pedido ou data inválida):', {
+          rowIndex: i + 1,
+          rawOrderId,
+          rawOrderDate,
+          parsedDate: orderDate,
+        });
+      }
+      skippedCount++;
       continue;
     }
 
@@ -314,16 +416,36 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
       }
     }
 
-    // Valida se tem revenue válido antes de adicionar
-    if (!baseRevenue || baseRevenue <= 0) {
-      console.warn(`[Aggregator] Linha ${i + 1} ignorada: revenue inválido (${baseRevenue}) para pedido ${rawOrderId}`);
+    // Valida se tem revenue válido antes de adicionar (mas permite 0 se tiver order_value)
+    const hasValidValue = baseRevenue > 0 || orderValue > 0;
+    if (!hasValidValue) {
+      if (skippedCount < 5) {
+        console.warn(`[Aggregator] Linha ${i + 1} ignorada: sem valor válido (revenue=${baseRevenue}, orderValue=${orderValue}) para pedido ${rawOrderId}`);
+      }
+      skippedCount++;
       continue;
     }
-    
+
+    processedCount++;
+
+    // Determina o nome da plataforma para exibição
+    let displayPlatformName = platformNameValue;
+    if (!displayPlatformName && inferredMarketplace) {
+      const marketplaceDisplayNames: Record<string, string> = {
+        'meli': 'Mercado Livre',
+        'shopee': 'Shopee',
+        'shein': 'Shein',
+        'tiktok': 'TikTok',
+        'amazon': 'Amazon',
+        'magalu': 'Magalu',
+      };
+      displayPlatformName = marketplaceDisplayNames[inferredMarketplace] || inferredMarketplace;
+    }
+
     normalized.push({
       platform_order_id: String(rawOrderId),
       external_order_id: externalOrderId ? String(externalOrderId).trim() : undefined,
-      platform_name: platformNameValue || 'Mercado Livre',
+      platform_name: displayPlatformName || 'Mercado Livre',
       store_name: storeName,
       order_date: orderDate,
       settlement_date: undefined,
@@ -350,7 +472,8 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
   const ordersWithFees = normalized.filter(o => (o.total_fees ?? 0) > 0 || (o.commissions ?? 0) > 0).length;
   const totalFeesSum = normalized.reduce((sum, o) => sum + (o.total_fees ?? 0), 0);
   const totalCommissionsSum = normalized.reduce((sum, o) => sum + (o.commissions ?? 0), 0);
-  
+
+  console.log(`[Aggregator] Processamento concluído: ${processedCount} processados, ${skippedCount} ignorados, ${normalized.length} válidos`);
   console.log(
     `[Aggregator] ✅ ${normalized.length} pedidos normalizados para ${inferredMarketplace}`
   );
@@ -368,16 +491,46 @@ function tryDetectAggregatorFormat(rows: any[][]): ParserResult | null {
 }
 
 /**
+ * Normaliza o nome do marketplace para o formato interno
+ */
+function normalizeMarketplaceHint(hint: string | null | undefined): MarketplaceName | null {
+  if (!hint) return null;
+
+  const hintLower = hint.toLowerCase().trim();
+
+  // Mapeamento de valores do frontend para nomes internos
+  const marketplaceMap: Record<string, MarketplaceName> = {
+    'mercadolivre': 'meli',
+    'mercado livre': 'meli',
+    'meli': 'meli',
+    'ml': 'meli',
+    'shopee': 'shopee',
+    'shein': 'shein',
+    'tiktok': 'tiktok',
+    'tiktok shop': 'tiktok',
+  };
+
+  return marketplaceMap[hintLower] || null;
+}
+
+/**
  * Tenta identificar o marketplace e fazer o parsing dos dados da planilha.
  * Fluxo:
  * 1) Tenta parsers nativos (layouts oficiais).
  * 2) Se nenhum bater, tenta formato agregador (UpSeller/hub).
+ * 3) Se o marketplace foi selecionado pelo usuário, usa como fallback.
+ *
+ * @param rows Linhas da planilha
+ * @param marketplaceHint Marketplace selecionado pelo usuário (opcional)
  */
-export function detectAndParse(rows: any[][]): ParserResult | null {
+export function detectAndParse(rows: any[][], marketplaceHint?: string | null): ParserResult | null {
   if (!rows || rows.length === 0) {
     console.warn('[detectAndParse] Planilha vazia ou sem dados.');
     return null;
   }
+
+  const normalizedHint = normalizeMarketplaceHint(marketplaceHint);
+  console.log('[detectAndParse] Marketplace selecionado pelo usuário:', marketplaceHint, '→', normalizedHint);
 
   if (rows.length > 0) {
     const headerRow = rows[0];
@@ -388,13 +541,51 @@ export function detectAndParse(rows: any[][]): ParserResult | null {
     );
   }
 
-  // 1) Parsers nativos
+  // 1) Se o usuário selecionou um marketplace, tenta primeiro o parser nativo dele
   const parserNames = Object.keys(parsers);
+
+  const hintParser = normalizedHint ? parsers[normalizedHint as keyof typeof parsers] : null;
+  if (normalizedHint && hintParser) {
+    console.log(`[detectAndParse] Tentando parser do marketplace selecionado primeiro: ${normalizedHint}...`);
+    try {
+      const normalizedData = hintParser.parse(rows);
+      if (normalizedData && normalizedData.length > 0) {
+        console.log(
+          `[detectAndParse] ✅ Marketplace identificado pelo parser selecionado: ${normalizedHint} (${normalizedData.length} pedidos)`
+        );
+        return {
+          marketplaceName: normalizedHint,
+          normalizedData,
+        };
+      } else {
+        console.log(`[detectAndParse] Parser ${normalizedHint} (selecionado) não identificou a planilha`);
+        // Se o parser nativo não funcionou mas o usuário selecionou, tenta o agregador direto
+        console.log(`[detectAndParse] Tentando formato agregador com hint do usuário: ${normalizedHint}...`);
+        const aggregatorWithHint = tryDetectAggregatorFormat(rows, normalizedHint);
+        if (aggregatorWithHint) {
+          console.log(`[detectAndParse] ✅ Agregador funcionou com hint: ${aggregatorWithHint.marketplaceName}, ${aggregatorWithHint.normalizedData.length} pedidos`);
+          return aggregatorWithHint;
+        } else {
+          console.log(`[detectAndParse] ❌ Agregador também falhou com hint ${normalizedHint}`);
+        }
+      }
+    } catch (error: any) {
+      console.error(
+        `[detectAndParse] Erro ao tentar o parser selecionado '${normalizedHint}':`,
+        error?.message || error
+      );
+    }
+  }
+
+  // 2) Tenta outros parsers nativos
   console.log(
     `[detectAndParse] Tentando ${parserNames.length} parsers nativos: ${parserNames.join(', ')}`
   );
 
   for (const [name, parser] of Object.entries(parsers)) {
+    // Pula o parser já tentado
+    if (name === normalizedHint) continue;
+
     try {
       console.log(`[detectAndParse] Tentando parser nativo: ${name}...`);
       const normalizedData = parser.parse(rows);
@@ -418,9 +609,9 @@ export function detectAndParse(rows: any[][]): ParserResult | null {
     }
   }
 
-  // 2) Formato agregador (UpSeller / hub)
-  console.log('[detectAndParse] Tentando formato agregador (UpSeller/hub)...');
-  const aggregatorResult = tryDetectAggregatorFormat(rows);
+  // 3) Formato agregador (UpSeller / hub) - última tentativa
+  console.log('[detectAndParse] Tentando formato agregador (UpSeller/hub) sem hint...');
+  const aggregatorResult = tryDetectAggregatorFormat(rows, normalizedHint);
   if (aggregatorResult) {
     return aggregatorResult;
   }

@@ -17,6 +17,7 @@ export default function ImportPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [importResult, setImportResult] = useState<{
     marketplace?: string;
+    marketplaceHint?: string;
     orderCount?: number;
     skipped?: number;
     totalProcessed?: number;
@@ -55,6 +56,8 @@ export default function ImportPage() {
       formData.append('file', file);
       // Se não houver storeId selecionado, será criado automaticamente
       formData.append('storeId', 'temp-store-id');
+      // IMPORTANTE: Envia o marketplace selecionado para garantir a detecção correta
+      formData.append('marketplace', marketplace);
 
       const response = await fetch('/api/import', {
         method: 'POST',
@@ -116,6 +119,7 @@ export default function ImportPage() {
       setUploadStatus('success');
       setImportResult({
         marketplace: result.marketplace,
+        marketplaceHint: result.marketplaceHint, // Debug
         orderCount: result.orderCount || 0,
         skipped: result.skipped || 0,
         totalProcessed: result.totalProcessed || 0,
@@ -216,6 +220,7 @@ export default function ImportPage() {
               </div>
               <div className="pl-7 space-y-1 text-sm text-green-700 dark:text-green-300">
                 <p>Marketplace detectado: <strong>{importResult.marketplace}</strong></p>
+                <p>Marketplace selecionado: <strong>{importResult.marketplaceHint || 'N/A'}</strong></p>
                 <p>Pedidos importados: <strong>{importResult.orderCount}</strong></p>
                 {importResult.skipped && importResult.skipped > 0 && (
                   <p className="text-yellow-700 dark:text-yellow-300">

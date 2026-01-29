@@ -7,20 +7,22 @@ import type { Database } from '@/types/supabase';
 
 /**
  * Processa um arquivo Excel e importa os dados no banco de dados.
- * 
+ *
  * @param supabase Cliente Supabase (deve ser passado da Route Handler)
  * @param fileBuffer Buffer do arquivo .xlsx
  * @param userId ID do usuário autenticado
  * @param storeId ID da loja (ou 'temp-store-id' para criar automaticamente)
  * @param fileName Nome original do arquivo
+ * @param marketplaceHint Marketplace selecionado pelo usuário (opcional, usado como fallback)
  * @returns Resultado da importação com estrutura padronizada
  */
 export async function processImport(
   supabase: SupabaseClient<Database>,
-  fileBuffer: Buffer, 
-  userId: string, 
-  storeId: string, 
-  fileName: string
+  fileBuffer: Buffer,
+  userId: string,
+  storeId: string,
+  fileName: string,
+  marketplaceHint?: string | null
 ): Promise<{
   success: boolean;
   message: string;
@@ -94,9 +96,10 @@ export async function processImport(
 
     // 5. Detecta e faz parse dos dados
     console.log(`[processImport] Tentando detectar marketplace...`);
+    console.log(`[processImport] Marketplace selecionado pelo usuário:`, marketplaceHint);
     console.log(`[processImport] Primeiras 3 linhas para debug:`, rows.slice(0, 3));
-    
-    const result = detectAndParse(rows);
+
+    const result = detectAndParse(rows, marketplaceHint);
 
     if (!result) {
       // Mostra informações detalhadas para ajudar no debug
@@ -123,7 +126,10 @@ export async function processImport(
     }
 
     if (!result.normalizedData || result.normalizedData.length === 0) {
-      throw new Error('Nenhum pedido válido foi encontrado na planilha após o processamento.');
+      // Mostra as colunas detectadas para ajudar no debug
+      const headerRow = rows[0] || [];
+      const headerText = headerRow.map((h: any) => String(h ?? '').trim()).filter(Boolean).slice(0, 15).join(', ');
+      throw new Error(`Nenhum pedido válido encontrado. Marketplace: ${result.marketplaceName}. Colunas detectadas: ${headerText}. Verifique se existem colunas de ID do pedido e Data.`);
     }
 
     console.log(`[processImport] Marketplace detectado: ${result.marketplaceName}, ${result.normalizedData.length} pedidos normalizados`);

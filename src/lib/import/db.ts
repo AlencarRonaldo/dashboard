@@ -36,35 +36,76 @@ export async function saveDataToDatabase(
   
   if (storeId === 'temp-store-id' || !storeId) {
     // Normaliza o nome do marketplace para buscar no banco
-    const marketplaceNameMap: { [key: string]: string } = {
-      'meli': 'meli',
-      'mercadolivre': 'meli',
-      'mercado livre': 'meli',
-      'shopee': 'shopee',
-      'shein': 'shein',
-      'tiktok': 'tiktok',
-      'tiktok shop': 'tiktok',
+    // Mapeia nomes internos para possíveis nomes no banco
+    const marketplaceSearchTerms: { [key: string]: string[] } = {
+      'meli': ['meli', 'mercadolivre', 'mercado livre', 'mercado_livre', 'ml'],
+      'shopee': ['shopee'],
+      'shein': ['shein'],
+      'tiktok': ['tiktok', 'tiktok shop', 'tiktok_shop'],
+      'amazon': ['amazon'],
+      'magalu': ['magalu', 'magazine luiza'],
     };
-    
-    const normalizedMarketplaceName = marketplaceNameMap[marketplaceName.toLowerCase()] || marketplaceName.toLowerCase();
-    
-    // Busca ou cria uma loja padrão para o marketplace
-    const { data: marketplaceData, error: marketplaceError } = await (supabase as any)
-      .from('marketplaces')
-      .select('id, name, display_name')
-      .eq('name', normalizedMarketplaceName)
-      .maybeSingle();
 
-    if (marketplaceError) {
-      console.error('Erro ao buscar marketplace:', marketplaceError);
-      throw new Error(`Erro ao buscar marketplace: ${marketplaceError.message}`);
+    // Determina qual grupo de termos usar
+    const normalizedKey = marketplaceName.toLowerCase().replace(/[_\s-]/g, '');
+    let searchTerms: string[] = [];
+
+    for (const [key, terms] of Object.entries(marketplaceSearchTerms)) {
+      if (key === normalizedKey || terms.some(t => t.replace(/[_\s-]/g, '') === normalizedKey)) {
+        searchTerms = terms;
+        break;
+      }
+    }
+
+    // Se não encontrou, usa o nome original
+    if (searchTerms.length === 0) {
+      searchTerms = [marketplaceName.toLowerCase()];
+    }
+
+    console.log('[saveDataToDatabase] Buscando marketplace com termos:', searchTerms);
+
+    // Busca o marketplace tentando vários nomes possíveis
+    let marketplaceData = null;
+    let marketplaceError = null;
+
+    for (const term of searchTerms) {
+      const { data, error } = await (supabase as any)
+        .from('marketplaces')
+        .select('id, name, display_name')
+        .eq('name', term)
+        .maybeSingle();
+
+      if (data) {
+        marketplaceData = data;
+        console.log('[saveDataToDatabase] Marketplace encontrado com termo:', term);
+        break;
+      }
+      marketplaceError = error;
+    }
+
+    // Se ainda não encontrou, tenta buscar por display_name
+    if (!marketplaceData) {
+      console.log('[saveDataToDatabase] Tentando buscar por display_name...');
+      for (const term of searchTerms) {
+        const { data } = await (supabase as any)
+          .from('marketplaces')
+          .select('id, name, display_name')
+          .ilike('display_name', `%${term}%`)
+          .maybeSingle();
+
+        if (data) {
+          marketplaceData = data;
+          console.log('[saveDataToDatabase] Marketplace encontrado por display_name:', term);
+          break;
+        }
+      }
     }
 
     // Type assertion para marketplace
     const marketplace = marketplaceData as { id: string; name: string; display_name: string } | null;
 
     if (!marketplace) {
-      console.error(`[saveDataToDatabase] Marketplace ${normalizedMarketplaceName} não encontrado.`);
+      console.error(`[saveDataToDatabase] Marketplace ${marketplaceName} não encontrado.`);
       // Tenta buscar todos os marketplaces para debug
       const { data: allMarketplaces, error: allMpError } = await (supabase as any)
         .from('marketplaces')
@@ -76,29 +117,30 @@ export async function saveDataToDatabase(
         console.log('[saveDataToDatabase] Marketplaces disponíveis no banco:', allMarketplaces);
       }
 
-      throw new Error(`Marketplace "${marketplaceName}" não encontrado. Verifique se o marketplace está cadastrado no banco de dados.`);
+      throw new Error(`Marketplace "${marketplaceName}" não encontrado. Verifique se o marketplace está cadastrado no banco de dados. Termos buscados: ${searchTerms.join(', ')}`);
     }
 
-    console.log(`[saveDataToDatabase] Marketplace encontrado: ${marketplace.name} (ID: ${marketplace.id})`);
-    
+    console.log(`[saveDataToDatabase] ✅ Marketplace encontrado: ${marketplace.name} (ID: ${marketplace.id}, display: ${marketplace.display_name})`);
+
     // Verifica se já existe uma loja para este marketplace e usuário
+    console.log(`[saveDataToDatabase] Buscando loja existente para user_id=${userId}, marketplace_id=${marketplace.id}`);
     const { data: existingStoreData, error: storeCheckError } = await (supabase as any)
       .from('stores')
-      .select('id')
+      .select('id, name')
       .eq('user_id', userId)
       .eq('marketplace_id', marketplace.id)
       .limit(1)
       .maybeSingle();
 
     if (storeCheckError) {
-      console.error('Erro ao verificar loja existente:', storeCheckError);
+      console.error('[saveDataToDatabase] Erro ao verificar loja existente:', storeCheckError);
     }
 
-    const existingStore = existingStoreData as { id: string } | null;
+    const existingStore = existingStoreData as { id: string; name: string } | null;
 
     if (existingStore) {
       finalStoreId = existingStore.id;
-      console.log(`Usando loja existente: ${finalStoreId}`);
+      console.log(`[saveDataToDatabase] ✅ Usando loja existente: ${existingStore.name} (ID: ${finalStoreId})`);
     } else {
       // Cria uma nova loja
       const storeName = `Loja ${marketplace.display_name || marketplaceName}`;
@@ -124,8 +166,10 @@ export async function saveDataToDatabase(
       }
 
       finalStoreId = newStore.id;
-      console.log(`Loja criada com sucesso: ${finalStoreId} (${storeName})`);
+      console.log(`[saveDataToDatabase] ✅ Loja criada com sucesso: ${finalStoreId} (${storeName})`);
     }
+
+    console.log(`[saveDataToDatabase] 📦 Store final para salvar pedidos: ${finalStoreId} (marketplace: ${marketplace.name})`);
   } else {
     // Valida se a loja existe e pertence ao usuário
     const { data: store, error: storeError } = await (supabase as any)

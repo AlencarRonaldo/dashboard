@@ -2,16 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Upload, History, LogOut } from 'lucide-react';
+import { LayoutDashboard, Upload, History, LogOut, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/utils';
 import { useState } from 'react';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Importar', href: '/import', icon: Upload },
   { name: 'Histórico', href: '/history', icon: History },
+  { name: 'Usuários', href: '/admin/users', icon: Users },
 ];
 
 export function Navbar() {
@@ -72,15 +74,18 @@ export function Navbar() {
               })}
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            {isLoggingOut ? 'Saindo...' : 'Sair'}
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {isLoggingOut ? 'Saindo...' : 'Sair'}
+            </Button>
+          </div>
         </div>
       </div>
     </nav>

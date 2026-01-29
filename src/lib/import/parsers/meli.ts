@@ -44,19 +44,16 @@ class MeliParser implements MarketplaceParser {
 
     // IMPORTANTE: Verifica primeiro se NÃO é de outro marketplace
     // Isso evita que planilhas da Shein, Shopee, TikTok sejam detectadas como MELI
+    // NOTA: Removido 'taxa de transação' pois é genérico e aparece em relatórios UpSeller de TODOS os marketplaces
     const otherMarketplaceIndicators = [
-      'valor de liquidação',    // Shein
-      'comissão de vendas',     // Shein
-      'taxa de serviço de envio', // Shein
-      'descontos sobre vendas', // TikTok
-      'ajustes',                // TikTok
-      'imposto',                // TikTok
-      'taxa de transação',      // Shopee
-      'desconto e subsídio da plataforma', // Shopee
-      'shopee',
-      'tiktok',
-      'tik tok',
-      'shein'
+      'valor de liquidação',    // Shein específico
+      'taxa de serviço de envio', // Shein específico
+      'descontos sobre vendas', // TikTok específico
+      'desconto e subsídio da plataforma', // Shopee específico
+      'shopee',                 // Nome do marketplace
+      'tiktok',                 // Nome do marketplace
+      'tik tok',                // Nome do marketplace
+      'shein'                   // Nome do marketplace
     ];
 
     const isOtherMarketplace = otherMarketplaceIndicators.some(indicator =>
@@ -125,13 +122,17 @@ class MeliParser implements MarketplaceParser {
     // Verifica colunas obrigatórias
     if (columnMap.platformOrderId === -1 && columnMap.externalOrderId === -1) {
       console.warn('[MeliParser] Nenhuma coluna de identificação de pedido encontrada');
+      console.warn('[MeliParser] Cabeçalho recebido:', headerRow);
       return null;
     }
 
     if (columnMap.orderDate === -1) {
       console.warn('[MeliParser] Coluna de data do pedido não encontrada');
+      console.warn('[MeliParser] Cabeçalho recebido:', headerRow);
       return null;
     }
+
+    console.log('[MeliParser] ✅ Colunas obrigatórias encontradas - platformOrderId:', columnMap.platformOrderId, ', externalOrderId:', columnMap.externalOrderId, ', orderDate:', columnMap.orderDate);
 
     const orders: NormalizedOrder[] = [];
     const rowResults: ParsedRowResult[] = [];
@@ -250,16 +251,12 @@ class MeliParser implements MarketplaceParser {
       return row[index];
     };
 
-    // Obtém ID do pedido (prioriza plataforma, depois externo)
-    let platformOrderId = getValue('platformOrderId');
+    // Obtém ID do pedido (plataforma e externo são independentes)
+    const platformOrderId = getValue('platformOrderId');
     const externalOrderId = getValue('externalOrderId');
 
-    // Se não tem ID da plataforma, usa o externo
-    if (!platformOrderId && externalOrderId) {
-      platformOrderId = externalOrderId;
-    }
-
-    if (!platformOrderId) {
+    // Precisa ter pelo menos um ID para identificar o pedido
+    if (!platformOrderId && !externalOrderId) {
       return {
         success: false,
         rowNumber,
@@ -319,8 +316,11 @@ class MeliParser implements MarketplaceParser {
     }
 
     // Monta o objeto do pedido
+    // Usa platformOrderId se existir, senão usa externalOrderId como ID principal
+    const mainOrderId = platformOrderId || externalOrderId;
+
     const order: NormalizedOrder = {
-      platform_order_id: String(platformOrderId).trim(),
+      platform_order_id: String(mainOrderId).trim(),
       external_order_id: externalOrderId ? String(externalOrderId).trim() : undefined,
       platform_name: getValue('platformName') ? String(getValue('platformName')).trim() : 'Mercado Livre',
       store_name: getValue('storeName') ? String(getValue('storeName')).trim() : undefined,

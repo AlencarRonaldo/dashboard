@@ -8,15 +8,15 @@ export async function middleware(request: NextRequest) {
       headers: request.headers,
     },
   })
-  
+
   const supabase = createMiddlewareClient(request, response)
-  
+
   // Usa getUser() que é mais seguro que getSession()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const protectedRoutes = ['/dashboard', '/import', '/history']
+  const protectedRoutes = ['/dashboard', '/import', '/history', '/admin']
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
   // Se não está autenticado e tenta acessar rota protegida, redireciona para login

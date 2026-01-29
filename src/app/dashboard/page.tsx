@@ -19,6 +19,7 @@ interface DashboardData {
     averageMargin: number;
     totalOrders: number;
     averageTicket: number;
+    totalFees: number;
   };
   marketplaceStats: Array<{
     marketplace: string;
@@ -169,12 +170,12 @@ export default function DashboardPage() {
           accent="blue"
         />
         <KpiCard
-          title="Receita Líquida"
-          value={formatCurrency(kpis.netRevenue)}
+          title="Total em Taxas"
+          value={formatCurrency(kpis.totalFees)}
           icon={<DollarSign className="h-4 w-4" />}
-          description="Após descontos"
-          trend={{ value: 0, isPositive: true }}
-          accent="purple"
+          description="Comissões e taxas"
+          trend={{ value: 0, isPositive: false }}
+          accent="indigo"
         />
         <KpiCard
           title="Lucro Total"

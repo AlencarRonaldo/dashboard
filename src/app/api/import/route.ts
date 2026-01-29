@@ -39,9 +39,11 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File | null;
     const storeId = formData.get('storeId') as string | null;
-    
+    const marketplace = formData.get('marketplace') as string | null;
+
     console.log('[API /api/import] Arquivo recebido:', file ? `${file.name} (${file.size} bytes)` : 'nenhum');
     console.log('[API /api/import] StoreId:', storeId);
+    console.log('[API /api/import] Marketplace selecionado:', marketplace);
 
     // 3. Validações
     if (!file) {
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     // 5. Processa a importação
     console.log('[API /api/import] Iniciando processamento da importação...');
-    const result = await processImport(supabase, buffer, session.user.id, storeId, file.name);
+    const result = await processImport(supabase, buffer, session.user.id, storeId, file.name, marketplace);
     console.log('[API /api/import] Processamento concluído:', result);
 
     // 6. Retorna resposta de sucesso (sempre JSON)
@@ -108,6 +110,7 @@ export async function POST(request: NextRequest) {
       success: result.success !== false,
       message: result.message || 'Importação concluída',
       marketplace: result.marketplace || 'desconhecido',
+      marketplaceHint: marketplace, // Debug: marketplace selecionado pelo usuário
       orderCount: result.orderCount || 0,
       skipped: result.skipped || 0,
       totalProcessed: result.totalProcessed || 0,

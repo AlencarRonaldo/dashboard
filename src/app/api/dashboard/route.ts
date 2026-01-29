@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // 2. Busca todos os pedidos do usuário
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, platform_order_id, order_date, settlement_date, store_id')
+      .select('id, platform_order_id, external_order_id, order_date, settlement_date, store_id')
       .in('store_id', storeIds)
       .order('order_date', { ascending: false });
 
@@ -265,6 +265,7 @@ export async function GET(request: NextRequest) {
         return {
           id: order.id,
           platform_order_id: order.platform_order_id || 'N/A',
+          external_order_id: order.external_order_id || null,
           date: orderDate,
           settlement_date: settlementDate,
           marketplace: storeInfo.marketplace,

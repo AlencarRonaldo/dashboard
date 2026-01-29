@@ -10,8 +10,8 @@ interface KpiCardProps {
     value: number;
     isPositive: boolean;
   };
-  /** Cor de destaque do card: blue, green, emerald, purple, orange, pink */
-  accent?: 'blue' | 'green' | 'emerald' | 'purple' | 'orange' | 'pink';
+  /** Cor de destaque do card: blue, green, emerald, purple, orange, pink, indigo */
+  accent?: 'blue' | 'green' | 'emerald' | 'purple' | 'orange' | 'pink' | 'indigo';
 }
 
 const accentStyles = {
@@ -44,6 +44,11 @@ const accentStyles = {
     border: 'border-l-4 border-l-pink-500',
     icon: 'bg-pink-100 text-pink-600 dark:bg-pink-950 dark:text-pink-400',
     value: 'text-pink-700 dark:text-pink-300',
+  },
+  indigo: {
+    border: 'border-l-4 border-l-indigo-700',
+    icon: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400',
+    value: 'text-indigo-800 dark:text-indigo-300',
   },
 };
 

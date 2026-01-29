@@ -102,7 +102,9 @@ export const COLUMN_SYNONYMS: Record<string, string[]> = {
     'nº de venda', 'numero de venda', 'n° de venda', 'order number',
     'número do pedido', 'numero do pedido', 'cod_pedido', 'cod pedido',
     'id do pedido', 'pedido', 'sale id', 'venda id', 'nº pedido plataforma',
-    'número de venda', 'orderid', 'id da venda', 'id venda', 'venda id', 'pedido ml'
+    'número de venda', 'orderid', 'id da venda', 'id venda', 'venda id', 'pedido ml',
+    'id mercado livre', 'id ml', 'pedido mercado livre', 'mlb', 'order ml',
+    'nº venda ml', 'numero venda ml', 'id shopee', 'pedido shopee'
   ],
 
   // ID Externo (Sistema de Gestão)

@@ -18,11 +18,24 @@ interface ImportHistory {
   finishedAt?: string | null;
 }
 
+interface DiagnoseData {
+  totalOrders: number;
+  stores: any[];
+  allMarketplaces: any[];
+  platformNameCounts: Record<string, number>;
+  storeIdCounts: Record<string, number>;
+  importIdCounts: Record<string, number>;
+  imports: any[];
+  sampleOrders: any[];
+}
+
 export default function HistoryPage() {
   const [history, setHistory] = useState<ImportHistory[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImport, setSelectedImport] = useState<ImportHistory | null>(null);
+  const [diagnoseData, setDiagnoseData] = useState<DiagnoseData | null>(null);
+  const [showDiagnose, setShowDiagnose] = useState(false);
 
   const filteredHistory = history.filter(item => {
     if (!searchTerm) return true;
@@ -218,15 +231,161 @@ export default function HistoryPage() {
     fetchImportDetails(importItem.id);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir esta importação?')) {
-      // TODO: Implementar API de exclusão
-      console.log('Deletar importação:', id);
+  const handleDelete = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta importação? Todos os pedidos relacionados serão removidos.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/imports/${id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao deletar importação');
+      }
+
+      alert(data.message || 'Importação deletada com sucesso!');
+      fetchImports(); // Atualiza a lista
+    } catch (error: any) {
+      console.error('Erro ao deletar:', error);
+      alert(`Erro ao deletar importação: ${error.message}`);
     }
   };
 
   const handleRefresh = () => {
     fetchImports();
+  };
+
+  const handleClearAllData = async () => {
+    if (!confirm('ATENÇÃO: Isso vai DELETAR TODOS os pedidos e importações. Tem certeza?')) {
+      return;
+    }
+
+    if (!confirm('Esta ação é IRREVERSÍVEL. Confirma a exclusão de TODOS os dados?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/clear-data', {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao limpar dados');
+      }
+
+      alert(data.message || 'Dados limpos com sucesso!');
+      fetchImports();
+    } catch (error: any) {
+      console.error('Erro ao limpar dados:', error);
+      alert(`Erro ao limpar dados: ${error.message}`);
+    }
+  };
+
+  const handleClearByMarketplace = async (marketplace: string, displayName: string) => {
+    if (!confirm(`Deletar todos os pedidos do ${displayName}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/clear-data?marketplace=${marketplace}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao limpar dados');
+      }
+
+      alert(data.message || `Dados do ${displayName} deletados!`);
+      fetchImports();
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Erro ao limpar dados:', error);
+      alert(`Erro: ${error.message}`);
+    }
+  };
+
+  const fetchDiagnose = async () => {
+    try {
+      const response = await fetch('/api/admin/diagnose-orders');
+      const data = await response.json();
+      if (response.ok) {
+        setDiagnoseData(data);
+        setShowDiagnose(true);
+      } else {
+        alert(`Erro: ${data.error}`);
+      }
+    } catch (error: any) {
+      alert(`Erro: ${error.message}`);
+    }
+  };
+
+  const handleDeleteByImportId = async (importId: string, fileName: string) => {
+    if (!confirm(`Deletar todos os pedidos do import "${fileName}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/diagnose-orders?import_id=${importId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao deletar');
+      }
+
+      alert(data.message);
+      fetchDiagnose();
+      fetchImports();
+      window.location.reload();
+    } catch (error: any) {
+      alert(`Erro: ${error.message}`);
+    }
+  };
+
+  const handleDeleteByPlatformName = async (platformName: string) => {
+    // Primeiro, busca quantos pedidos serão afetados
+    try {
+      const checkResponse = await fetch(`/api/admin/delete-by-platform?platform_name=${encodeURIComponent(platformName)}`);
+      const checkData = await checkResponse.json();
+
+      if (!checkResponse.ok) {
+        throw new Error(checkData.error || 'Erro ao verificar pedidos');
+      }
+
+      if (checkData.count === 0) {
+        alert(`Nenhum pedido encontrado com platform_name contendo "${platformName}"`);
+        return;
+      }
+
+      if (!confirm(`Encontrados ${checkData.count} pedidos com platform_name "${platformName}". Deseja deletar?`)) {
+        return;
+      }
+
+      const response = await fetch(`/api/admin/delete-by-platform?platform_name=${encodeURIComponent(platformName)}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao deletar pedidos');
+      }
+
+      alert(data.message || `${data.deletedOrders} pedidos deletados!`);
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Erro:', error);
+      alert(`Erro: ${error.message}`);
+    }
   };
 
   if (isLoading && history.length === 0) {
@@ -251,11 +410,137 @@ export default function HistoryPage() {
             Visualize todas as importações realizadas e seus status
           </p>
         </div>
-        <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Atualizar
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
+          <Button
+            variant="outline"
+            className="text-blue-600 border-blue-600 hover:bg-blue-50"
+            onClick={() => handleDeleteByPlatformName('Mercado')}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Deletar Pedidos ML
+          </Button>
+          <Button
+            variant="outline"
+            className="text-orange-600 border-orange-600 hover:bg-orange-50"
+            onClick={() => handleClearByMarketplace('meli', 'Mercado Livre')}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpar Loja ML
+          </Button>
+          <Button
+            variant="outline"
+            className="text-orange-600 border-orange-600 hover:bg-orange-50"
+            onClick={() => handleClearByMarketplace('shopee', 'Shopee')}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpar Loja Shopee
+          </Button>
+          <Button variant="destructive" onClick={handleClearAllData}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpar Tudo
+          </Button>
+          <Button variant="secondary" onClick={fetchDiagnose}>
+            <Eye className="h-4 w-4 mr-2" />
+            Diagnóstico
+          </Button>
+        </div>
       </div>
+
+      {/* Painel de Diagnóstico */}
+      {showDiagnose && diagnoseData && (
+        <Card className="border-2 border-blue-500">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-blue-600">Diagnóstico de Pedidos</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setShowDiagnose(false)}>✕</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-3 bg-gray-100 rounded">
+                <div className="text-2xl font-bold">{diagnoseData.totalOrders}</div>
+                <div className="text-sm text-gray-600">Total de Pedidos</div>
+              </div>
+              <div className="p-3 bg-gray-100 rounded">
+                <div className="text-2xl font-bold">{diagnoseData.stores?.length || 0}</div>
+                <div className="text-sm text-gray-600">Lojas</div>
+              </div>
+              <div className="p-3 bg-gray-100 rounded">
+                <div className="text-2xl font-bold">{diagnoseData.imports?.length || 0}</div>
+                <div className="text-sm text-gray-600">Imports</div>
+              </div>
+              <div className="p-3 bg-gray-100 rounded">
+                <div className="text-2xl font-bold">{Object.keys(diagnoseData.platformNameCounts || {}).length}</div>
+                <div className="text-sm text-gray-600">Platform Names</div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-semibold mb-2">Por Platform Name:</h4>
+                <div className="space-y-1 text-sm">
+                  {Object.entries(diagnoseData.platformNameCounts || {}).map(([name, count]) => (
+                    <div key={name} className="flex justify-between bg-gray-50 p-2 rounded">
+                      <span>{name}</span>
+                      <span className="font-bold">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">Por Loja:</h4>
+                <div className="space-y-1 text-sm">
+                  {diagnoseData.stores?.map((store: any) => (
+                    <div key={store.id} className="bg-gray-50 p-2 rounded">
+                      <div className="flex justify-between">
+                        <span>{store.name}</span>
+                        <span className="font-bold">{diagnoseData.storeIdCounts?.[store.id] || 0} pedidos</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        marketplace: {store.marketplaces?.name} ({store.marketplaces?.display_name})
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-2">Marketplaces no Banco:</h4>
+              <div className="space-y-1 text-sm">
+                {diagnoseData.allMarketplaces?.map((mp: any) => (
+                  <div key={mp.id} className="flex justify-between bg-yellow-50 p-2 rounded">
+                    <span><strong>name:</strong> {mp.name}</span>
+                    <span><strong>display:</strong> {mp.display_name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-2">Imports (clique para deletar):</h4>
+              <div className="space-y-1 text-sm">
+                {diagnoseData.imports?.map((imp: any) => (
+                  <div key={imp.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                    <span>{imp.file_name} - {diagnoseData.importIdCounts?.[imp.id] || 0} pedidos</span>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteByImportId(imp.id, imp.file_name)}
+                    >
+                      Deletar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Resumo */}
       {history.length > 0 && (

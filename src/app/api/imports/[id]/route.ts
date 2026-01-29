@@ -1,6 +1,105 @@
 import { createServerFromRequest } from '@/lib/supabase/utils'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// DELETE /api/imports/[id] - Deleta uma importação e todos os dados relacionados
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { supabase, response } = createServerFromRequest(request)
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
+  try {
+    const { id } = await params
+    const importId = id
+
+    // Verifica se a importação existe e pertence ao usuário
+    const { data: importRecord, error: importError } = await supabase
+      .from('imports')
+      .select('id')
+      .eq('id', importId)
+      .eq('user_id', session.user.id)
+      .single()
+
+    if (importError || !importRecord) {
+      return NextResponse.json(
+        { error: 'Importação não encontrada' },
+        { status: 404 }
+      )
+    }
+
+    // Busca os IDs dos pedidos desta importação
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('import_id', importId)
+
+    const orderIds = (orders || []).map(o => o.id)
+
+    // Deleta em cascata: financials -> items -> orders -> import
+    if (orderIds.length > 0) {
+      // Deleta dados financeiros dos pedidos
+      await supabase
+        .from('order_financials')
+        .delete()
+        .in('order_id', orderIds)
+
+      // Deleta itens dos pedidos
+      await supabase
+        .from('order_items')
+        .delete()
+        .in('order_id', orderIds)
+
+      // Deleta os pedidos
+      await supabase
+        .from('orders')
+        .delete()
+        .eq('import_id', importId)
+    }
+
+    // Deleta a importação
+    const { error: deleteError } = await supabase
+      .from('imports')
+      .delete()
+      .eq('id', importId)
+
+    if (deleteError) {
+      console.error('Erro ao deletar importação:', deleteError)
+      return NextResponse.json(
+        { error: 'Erro ao deletar importação: ' + deleteError.message },
+        { status: 500 }
+      )
+    }
+
+    const finalResponse = NextResponse.json({
+      success: true,
+      message: `Importação deletada com sucesso. ${orderIds.length} pedidos removidos.`
+    }, { status: 200 })
+
+    // Copia os cookies da resposta do Supabase
+    response.cookies.getAll().forEach(cookie => {
+      finalResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+
+    return finalResponse
+  } catch (error: any) {
+    console.error('Import Delete API Error:', error)
+    return NextResponse.json(
+      { error: error?.message || 'Erro interno ao deletar importação' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

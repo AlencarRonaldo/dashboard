@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getMarketplaceColors } from '@/lib/marketplace-colors';
 
 interface MarketplaceCardProps {
   marketplace: string;
@@ -18,30 +19,6 @@ interface MarketplaceCardProps {
   };
 }
 
-// Mapeamento de cores por marketplace
-const marketplaceColors: Record<string, { primary: string; bg: string; border: string }> = {
-  'Mercado Livre': {
-    primary: '#FFE135',
-    bg: '#FFF9E6',
-    border: '#FFE135',
-  },
-  'Shopee': {
-    primary: '#EE4D2D',
-    bg: '#FFF4F0',
-    border: '#EE4D2D',
-  },
-  'Shein': {
-    primary: '#1F2937',
-    bg: '#F3F4F6',
-    border: '#1F2937',
-  },
-  'TikTok Shop': {
-    primary: '#00F2EA',
-    bg: '#E6FFFE',
-    border: '#00F2EA',
-  },
-};
-
 export function MarketplaceCard({
   marketplace,
   revenue,
@@ -52,16 +29,25 @@ export function MarketplaceCard({
   totalRevenue,
   trend,
 }: MarketplaceCardProps) {
-  const colors = marketplaceColors[marketplace] || {
-    primary: '#6B7280',
-    bg: '#F9FAFB',
-    border: '#E5E7EB',
-  };
+  const colors = getMarketplaceColors(marketplace);
 
   return (
-    <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: colors.border }}>
+    <Card
+      className="relative overflow-hidden border-l-4 bg-card text-card-foreground"
+      style={{ borderLeftColor: colors.border }}
+    >
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg font-semibold">{marketplace}</CardTitle>
+        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+          <span
+            className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+            style={{
+              backgroundColor: colors.bg,
+              color: colors.text,
+            }}
+          >
+            {marketplace}
+          </span>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
