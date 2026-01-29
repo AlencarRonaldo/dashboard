@@ -87,10 +87,10 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[50vh] sm:min-h-screen p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Carregando dados...</p>
+          <p className="mt-4 text-sm text-muted-foreground sm:text-base">Carregando dados...</p>
         </div>
       </div>
     );
@@ -98,12 +98,12 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-destructive">Erro: {error}</p>
+      <div className="flex items-center justify-center min-h-[50vh] sm:min-h-screen p-4">
+        <div className="text-center max-w-md">
+          <p className="text-destructive text-sm sm:text-base">Erro: {error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md"
+            className="mt-4 min-h-[44px] px-6 py-2 bg-primary text-primary-foreground rounded-md font-medium"
           >
             Tentar novamente
           </button>
@@ -114,9 +114,9 @@ export default function DashboardPage() {
 
   if (!data) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[50vh] sm:min-h-screen p-4">
         <div className="text-center">
-          <p className="text-muted-foreground">Nenhum dado disponível</p>
+          <p className="text-muted-foreground text-sm sm:text-base">Nenhum dado disponível</p>
         </div>
       </div>
     );
@@ -131,28 +131,17 @@ export default function DashboardPage() {
     orders,
   } = data;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Carregando dados...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <main className="p-4 md:p-8 space-y-6 bg-background min-h-screen">
-      <div className="flex items-center justify-between">
+    <main className="p-4 sm:p-6 md:p-8 space-y-6 bg-background min-h-screen">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral das suas vendas</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
+          <p className="text-sm text-muted-foreground sm:text-base">Visão geral das suas vendas</p>
         </div>
         <Select
           value={period}
           onChange={(e) => setPeriod(e.target.value as 'day' | 'month')}
-          className="w-40"
+          className="w-full sm:w-40"
         >
           <option value="day">Por Dia</option>
           <option value="month">Por Mês</option>
@@ -160,7 +149,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Métricas Gerais */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           title="Faturamento Total"
           value={formatCurrency(kpis.totalRevenue)}
@@ -213,8 +202,8 @@ export default function DashboardPage() {
 
       {/* Cards por Marketplace */}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight mb-4">Por Marketplace</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <h2 className="text-xl font-bold tracking-tight mb-4 sm:text-2xl">Por Marketplace</h2>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {marketplaceStats.map((stats) => (
             <MarketplaceCard
               key={stats.marketplace}
@@ -232,7 +221,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Gráficos */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <RevenueChart data={revenueData} period={period} />
         <MarketplaceChart data={marketplaceData} />
       </div>

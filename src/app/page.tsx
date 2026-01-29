@@ -3,10 +3,10 @@ import { Button } from '@/components/ui/button';
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <main className="flex min-h-screen w-full max-w-4xl flex-col items-center justify-center gap-8 py-16 px-8 text-center">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 sm:p-6">
+      <main className="flex min-h-screen w-full max-w-4xl flex-col items-center justify-center gap-6 sm:gap-8 py-12 sm:py-16 px-4 sm:px-8 text-center">
         <div className="flex flex-col items-center gap-6">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             Dashboard Analítico
           </h1>
           <p className="max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl">

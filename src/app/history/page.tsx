@@ -402,15 +402,15 @@ export default function HistoryPage() {
   }
 
   return (
-    <main className="p-4 md:p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <main className="p-4 sm:p-6 md:p-8 space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Histórico de Importações</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Histórico de Importações</h1>
+          <p className="text-sm text-muted-foreground sm:text-base">
             Visualize todas as importações realizadas e seus status
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
@@ -454,28 +454,28 @@ export default function HistoryPage() {
       {showDiagnose && diagnoseData && (
         <Card className="border-2 border-blue-500">
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-blue-600">Diagnóstico de Pedidos</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setShowDiagnose(false)}>✕</Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
+              <CardTitle className="text-blue-600 text-lg sm:text-xl">Diagnóstico de Pedidos</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setShowDiagnose(false)} className="self-start sm:self-auto">✕</Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-3 bg-gray-100 rounded">
+          <CardContent className="space-y-4 overflow-x-auto">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-3 bg-muted rounded">
                 <div className="text-2xl font-bold">{diagnoseData.totalOrders}</div>
-                <div className="text-sm text-gray-600">Total de Pedidos</div>
+                <div className="text-sm text-muted-foreground">Total de Pedidos</div>
               </div>
-              <div className="p-3 bg-gray-100 rounded">
+              <div className="p-3 bg-muted rounded">
                 <div className="text-2xl font-bold">{diagnoseData.stores?.length || 0}</div>
-                <div className="text-sm text-gray-600">Lojas</div>
+                <div className="text-sm text-muted-foreground">Lojas</div>
               </div>
-              <div className="p-3 bg-gray-100 rounded">
+              <div className="p-3 bg-muted rounded">
                 <div className="text-2xl font-bold">{diagnoseData.imports?.length || 0}</div>
-                <div className="text-sm text-gray-600">Imports</div>
+                <div className="text-sm text-muted-foreground">Imports</div>
               </div>
-              <div className="p-3 bg-gray-100 rounded">
+              <div className="p-3 bg-muted rounded">
                 <div className="text-2xl font-bold">{Object.keys(diagnoseData.platformNameCounts || {}).length}</div>
-                <div className="text-sm text-gray-600">Platform Names</div>
+                <div className="text-sm text-muted-foreground">Platform Names</div>
               </div>
             </div>
 
@@ -484,7 +484,7 @@ export default function HistoryPage() {
                 <h4 className="font-semibold mb-2">Por Platform Name:</h4>
                 <div className="space-y-1 text-sm">
                   {Object.entries(diagnoseData.platformNameCounts || {}).map(([name, count]) => (
-                    <div key={name} className="flex justify-between bg-gray-50 p-2 rounded">
+                    <div key={name} className="flex justify-between bg-muted/50 p-2 rounded">
                       <span>{name}</span>
                       <span className="font-bold">{count}</span>
                     </div>
@@ -495,12 +495,12 @@ export default function HistoryPage() {
                 <h4 className="font-semibold mb-2">Por Loja:</h4>
                 <div className="space-y-1 text-sm">
                   {diagnoseData.stores?.map((store: any) => (
-                    <div key={store.id} className="bg-gray-50 p-2 rounded">
+                    <div key={store.id} className="bg-muted/50 p-2 rounded">
                       <div className="flex justify-between">
                         <span>{store.name}</span>
                         <span className="font-bold">{diagnoseData.storeIdCounts?.[store.id] || 0} pedidos</span>
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         marketplace: {store.marketplaces?.name} ({store.marketplaces?.display_name})
                       </div>
                     </div>
@@ -513,7 +513,7 @@ export default function HistoryPage() {
               <h4 className="font-semibold mb-2">Marketplaces no Banco:</h4>
               <div className="space-y-1 text-sm">
                 {diagnoseData.allMarketplaces?.map((mp: any) => (
-                  <div key={mp.id} className="flex justify-between bg-yellow-50 p-2 rounded">
+                  <div key={mp.id} className="flex flex-col sm:flex-row sm:justify-between gap-1 bg-muted/50 p-2 rounded">
                     <span><strong>name:</strong> {mp.name}</span>
                     <span><strong>display:</strong> {mp.display_name}</span>
                   </div>
@@ -525,7 +525,7 @@ export default function HistoryPage() {
               <h4 className="font-semibold mb-2">Imports (clique para deletar):</h4>
               <div className="space-y-1 text-sm">
                 {diagnoseData.imports?.map((imp: any) => (
-                  <div key={imp.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                  <div key={imp.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-muted/50 p-2 rounded">
                     <span>{imp.file_name} - {diagnoseData.importIdCounts?.[imp.id] || 0} pedidos</span>
                     <Button
                       size="sm"
@@ -544,7 +544,7 @@ export default function HistoryPage() {
 
       {/* Resumo */}
       {history.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">{history.length}</div>
@@ -580,9 +580,9 @@ export default function HistoryPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>Importações</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Importações</CardTitle>
               <CardDescription>
                 Lista completa de arquivos importados
               </CardDescription>
@@ -591,14 +591,14 @@ export default function HistoryPage() {
               placeholder="Buscar por arquivo..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-64"
+              className="w-full sm:w-64"
             />
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+          <div className="rounded-md border overflow-hidden">
+            <div className="overflow-x-auto -mx-px">
+              <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="h-12 px-4 text-left align-middle font-medium">Data</th>

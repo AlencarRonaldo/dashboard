@@ -8,8 +8,6 @@ const nextConfig: NextConfig = {
    */
   turbopack: {
     root: __dirname,
-    // Se continuar tendo problemas com Turbopack, você pode desativá-lo:
-    // enabled: false,
   },
   reactCompiler: true,
 };

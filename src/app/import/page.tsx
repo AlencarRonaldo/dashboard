@@ -141,9 +141,9 @@ export default function ImportPage() {
   };
 
   return (
-    <main className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
+    <main className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Importar Dados</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Importar Dados</h1>
         <p className="text-muted-foreground">
           Faça upload de arquivos Excel com dados de vendas
         </p>
@@ -178,7 +178,7 @@ export default function ImportPage() {
             <div className="flex items-center gap-4">
               <label
                 htmlFor="file"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                className="flex flex-col items-center justify-center w-full min-h-[120px] sm:min-h-[128px] border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent transition-colors touch-manipulation"
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <Upload className="w-10 h-10 mb-3 text-muted-foreground" />

@@ -53,13 +53,13 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Pedidos Detalhados</CardTitle>
+        <CardTitle className="text-lg sm:text-xl">Pedidos Detalhados</CardTitle>
         <CardDescription>
           Lista completa de pedidos com filtros avançados
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 p-4 bg-muted/30 rounded-lg border border-border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 p-4 bg-muted/30 rounded-lg border border-border">
           <Select
             value={filters.marketplace}
             onChange={(e) => setFilters({ ...filters, marketplace: e.target.value })}
@@ -84,6 +84,7 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
             placeholder="Buscar por Nº do Pedido..."
             value={filters.orderId}
             onChange={(e) => setFilters({ ...filters, orderId: e.target.value })}
+            className="sm:col-span-2 lg:col-span-1"
           />
           
           <Input
@@ -101,19 +102,65 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
           />
         </div>
 
-        <div className="rounded-md border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        {/* Mobile: cards */}
+        <div className="md:hidden space-y-3">
+          {filteredOrders.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              Nenhum pedido encontrado
+            </div>
+          ) : (
+            filteredOrders.map((order) => (
+              <div
+                key={order.id}
+                className="rounded-lg border border-border bg-card p-4 space-y-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-mono text-sm text-foreground">
+                    {order.platform_order_id || order.external_order_id || '-'}
+                  </span>
+                  <span className="text-sm font-medium text-foreground">{order.marketplace}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Data:</span>
+                    <span className="ml-1 text-foreground">{formatDate(order.date)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Loja:</span>
+                    <span className="ml-1 text-foreground">{order.store}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Faturamento:</span>
+                    <span className="ml-1 font-semibold text-foreground">{formatCurrency(order.revenue)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Lucro:</span>
+                    <span className="ml-1 font-semibold text-success">{formatCurrency(order.profit)}</span>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-border flex justify-between text-sm">
+                  <span className="text-muted-foreground">Margem</span>
+                  <span className="font-medium text-foreground">{order.margin.toFixed(2)}%</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop: tabela com scroll horizontal */}
+        <div className="hidden md:block rounded-md border border-border overflow-hidden">
+          <div className="overflow-x-auto -mx-px">
+            <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b border-border bg-muted">
-                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">Nº Pedido Plataforma</th>
-                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">Nº Pedido UpSeller</th>
-                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">Data</th>
-                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">Marketplace</th>
-                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground">Loja</th>
-                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground">Faturamento</th>
-                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground">Lucro</th>
-                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground">Margem</th>
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground whitespace-nowrap">Nº Pedido Plataforma</th>
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground whitespace-nowrap">Nº Pedido UpSeller</th>
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground whitespace-nowrap">Data</th>
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground whitespace-nowrap">Marketplace</th>
+                  <th className="h-12 px-4 text-left align-middle font-semibold text-foreground whitespace-nowrap">Loja</th>
+                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground whitespace-nowrap">Faturamento</th>
+                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground whitespace-nowrap">Lucro</th>
+                  <th className="h-12 px-4 text-right align-middle font-semibold text-foreground whitespace-nowrap">Margem</th>
                 </tr>
               </thead>
               <tbody>

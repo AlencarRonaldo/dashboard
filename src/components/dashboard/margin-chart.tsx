@@ -28,14 +28,15 @@ export function MarginChart({ data }: MarginChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
+        <div className="w-full h-[280px] sm:h-[320px] lg:h-[350px]">
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
               type="number"
               tickFormatter={(value) => `${value}%`}
             />
-            <YAxis dataKey="store" type="category" width={100} />
+            <YAxis dataKey="store" type="category" width={80} />
             <Tooltip
               formatter={(value) => `${(value as number)?.toFixed(2) ?? 0}%`}
             />
@@ -47,6 +48,7 @@ export function MarginChart({ data }: MarginChartProps) {
             />
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   );

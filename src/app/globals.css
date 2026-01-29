@@ -100,7 +100,36 @@
   border-color: hsl(var(--border));
 }
 
+/* Mobile-first: base 16px, fluido até 20px */
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Inputs em mobile: 16px evita zoom automático no iOS */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  font-size: 16px;
+}
+@media (min-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 0.875rem;
+  }
+}
+
+/* Safe area para notch/home indicator */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

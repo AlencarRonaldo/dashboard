@@ -144,7 +144,7 @@ export default function AdminUsersPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 sm:p-6">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -154,7 +154,7 @@ export default function AdminUsersPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 sm:p-6">
         <Card>
           <CardContent className="p-6">
             <p className="text-destructive">{error}</p>
@@ -165,10 +165,10 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Gerenciar Usuários</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Gerenciar Usuários</h1>
           <p className="text-muted-foreground">
             Adicione, edite ou remova usuários do sistema
           </p>
@@ -245,7 +245,7 @@ export default function AdminUsersPage() {
                       })
                     }
                     disabled={isSubmitting}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex min-h-[44px] w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="user">Usuário</option>
                     <option value="admin">Administrador</option>
@@ -301,7 +301,7 @@ export default function AdminUsersPage() {
                 {users.map((user) => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between py-4 first:pt-0 last:pb-0"
+                    className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex items-center gap-4">
                       <div
@@ -336,7 +336,7 @@ export default function AdminUsersPage() {
                             e.target.value as 'admin' | 'user'
                           )
                         }
-                        className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="min-h-[44px] rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
                         <option value="user">Usuário</option>
                         <option value="admin">Administrador</option>

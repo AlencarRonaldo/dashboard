@@ -31,7 +31,8 @@ export function RevenueChart({ data, period = 'day' }: RevenueChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
+        <div className="w-full h-[280px] sm:h-[320px] lg:h-[350px]">
+        <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
@@ -74,6 +75,7 @@ export function RevenueChart({ data, period = 'day' }: RevenueChartProps) {
             />
           </LineChart>
         </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   );

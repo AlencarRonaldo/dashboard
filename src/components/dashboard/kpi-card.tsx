@@ -66,7 +66,7 @@ export function KpiCard({ title, value, icon, description, trend, accent }: KpiC
         )}
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold ${styles?.value ?? ''}`}>{value}</div>
+        <div className={`text-xl font-bold sm:text-2xl ${styles?.value ?? ''}`}>{value}</div>
         {description && (
           <p className="text-xs text-muted-foreground mt-1">{description}</p>
         )}
