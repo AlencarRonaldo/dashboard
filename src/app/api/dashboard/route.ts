@@ -14,11 +14,21 @@ export async function GET(request: NextRequest) {
   try {
     const userId = session.user.id;
 
-    // 1. Busca todas as lojas do usuário
-    const { data: stores, error: storesError } = await supabase
-      .from('stores')
-      .select('id')
-      .eq('user_id', userId);
+    // Verifica se o usuário é admin
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    const isAdmin = userProfile?.role === 'admin';
+
+    // 1. Busca lojas - admin vê todas, usuário comum só as próprias
+    let storesQuery = supabase.from('stores').select('id');
+    if (!isAdmin) {
+      storesQuery = storesQuery.eq('user_id', userId);
+    }
+    const { data: stores, error: storesError } = await storesQuery;
 
     if (storesError) throw storesError;
 
@@ -218,8 +228,8 @@ export async function GET(request: NextRequest) {
       const commissions = Number(financials.commissions || 0);
       const fees = Number(financials.total_fees || 0);
 
-      // Lucro = usar o valor salvo no banco (da planilha original)
-      const profit = Number(financials.profit || 0);
+      // Lucro = Faturamento - Taxas (fees + commissions)
+      const profit = orderValue - fees - commissions;
 
       // Faturamento para display = order_value
       const revenue = orderValue;

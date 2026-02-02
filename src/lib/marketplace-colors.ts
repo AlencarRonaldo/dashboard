@@ -29,7 +29,7 @@ export const marketplaceColors: Record<string, MarketplaceColorConfig> = {
   'Shein': {
     primary: '#1F2937',
     hover: '#111827',
-    bg: '#F3F4F6',
+    bg: '#1F2937',
     text: '#FFFFFF',
     border: '#1F2937',
   },
