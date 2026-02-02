@@ -15,15 +15,15 @@ export const marketplaceColors: Record<string, MarketplaceColorConfig> = {
   'Mercado Livre': {
     primary: '#FFE135',
     hover: '#FFD700',
-    bg: '#FFF9E6',
-    text: '#856404',
+    bg: '#FFE135',
+    text: '#1F2937',
     border: '#FFE135',
   },
   'Shopee': {
     primary: '#EE4D2D',
     hover: '#DC3D1D',
-    bg: '#FFF4F0',
-    text: '#7C2D12',
+    bg: '#EE4D2D',
+    text: '#FFFFFF',
     border: '#EE4D2D',
   },
   'Shein': {
@@ -36,8 +36,8 @@ export const marketplaceColors: Record<string, MarketplaceColorConfig> = {
   'TikTok Shop': {
     primary: '#00F2EA',
     hover: '#00D9D2',
-    bg: '#E6FFFE',
-    text: '#065F46',
+    bg: '#00F2EA',
+    text: '#1F2937',
     border: '#00F2EA',
   },
 };
